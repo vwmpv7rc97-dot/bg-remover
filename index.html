@@ -336,11 +336,11 @@ const modelBar = $('modelBar');
 const modelFill = $('modelFill');
 const modelPct = $('modelPct');
 
-// ===== 多 CDN 轮流尝试 =====
+// ===== 多 CDN 轮流尝试（含国内镜像） =====
 const CDN_LIST = [
-  ['esm.sh',   'https://esm.sh/@imgly/background-removal@1.6.0'],
-  ['jsdelivr', 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.6.0/dist/index.mjs'],
-  ['unpkg',    'https://unpkg.com/@imgly/background-removal@1.6.0/dist/index.mjs'],
+  ['npmmirror', 'https://registry.npmmirror.com/@imgly/background-removal/1.6.0/files/dist/index.mjs'],
+  ['esm.sh',    'https://esm.sh/@imgly/background-removal@1.6.0'],
+  ['jsdelivr',  'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.6.0/dist/index.mjs'],
 ];
 
 async function loadEngine() {
@@ -349,16 +349,20 @@ async function loadEngine() {
     try {
       const mod = await Promise.race([
         import(url),
-        new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 25000))
+        new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 12000))
       ]);
       removeBackgroundFn = mod.removeBackground;
-      console.log(`✅ 引擎加载 via ${name}`);
+      // 如果从 npmmirror 加载 JS，尝试让模型也从国内下载
+      if (name === 'npmmirror' && mod.setModelUrl) {
+        try { mod.setModelUrl('https://registry.npmmirror.com/@imgly/background-removal-data/1.6.0/files/'); } catch(e) {}
+      }
+      console.log(`✅ 引擎 via ${name}`);
       return;
     } catch (e) {
       console.warn(`❌ ${name}:`, e.message);
     }
   }
-  throw new Error('所有 CDN 均无法连接，请检查网络后刷新页面');
+  throw new Error('所有 CDN 均无法连接');
 }
 
 // ===== 预加载模型（用极小 PNG 触发下载） =====
@@ -400,18 +404,37 @@ async function preloadModel() {
   engineReady = true;
 }
 
-// ===== 启动流程 =====
+// ===== 启动流程（非阻塞） =====
+let pendingQueue = []; // 引擎就绪前的待处理队列
+
 (async function boot() {
+  statusDot.className = 'status-dot busy';
+  statusText.textContent = '加载抠图引擎…';
   try {
-    statusDot.className = 'status-dot busy';
-    statusText.textContent = '加载抠图引擎…';
     await loadEngine();
     statusText.textContent = '引擎就绪 · 预加载模型中…';
     await preloadModel();
+    // 处理排队中的图片
+    if (pendingQueue.length) {
+      statusText.textContent = `处理 ${pendingQueue.length} 张排队图片…`;
+      for (const id of pendingQueue) processImage(id);
+      pendingQueue = [];
+    }
   } catch (e) {
-    statusText.textContent = '❌ ' + e.message;
+    statusText.textContent = '⚠️ 引擎加载失败，可尝试刷新或使用备用方案';
     statusDot.className = 'status-dot';
     statusDot.style.background = 'var(--error)';
+    // 把所有排队图片标记为错误
+    for (const id of pendingQueue) {
+      const job = jobs.get(id);
+      if (job) {
+        job.status = 'error';
+        job.error = '抠图引擎未加载';
+        badge(id, 'badge-error', '失败');
+        $(`statusText-${id}`).textContent = '引擎未就绪';
+      }
+    }
+    pendingQueue = [];
   }
 })();
 
@@ -441,8 +464,7 @@ document.addEventListener('paste', e => {
 });
 
 async function handleFiles(fileList) {
-  if (!removeBackgroundFn) { alert('抠图引擎还在加载，请稍候…'); return; }
-  if (!engineReady) engineReady = true; // 预加载失败时直接进入使用
+  if (!engineReady) engineReady = true;
 
   const imageFiles = [];
   for (const f of Array.from(fileList)) {
@@ -509,7 +531,16 @@ function badge(id, cls, text) {
 // ===== 抠图 =====
 async function processImage(id) {
   const job = jobs.get(id);
-  if (!job || !removeBackgroundFn) return;
+  if (!job) return;
+
+  // 引擎未就绪 → 排队
+  if (!removeBackgroundFn) {
+    pendingQueue.push(id);
+    $(`statusText-${id}`).textContent = '等待引擎就绪…';
+    badge(id, 'badge-downloading', '排队');
+    return;
+  }
+
   job.status = 'processing';
   activeCount++;
   updateStatus();
