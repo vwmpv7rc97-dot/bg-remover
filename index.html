@@ -174,8 +174,8 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
   <div class="ed-hint" id="edHint">轻点选择区域 · 长按涂抹 · 双指缩放平移</div>
   <div class="ed-bottom">
     <div class="ed-tools" id="edTools">
-      <button class="ed-tool-btn active" data-tool="magic">
-        <span style="font-size:20px">🪄</span>智能选取
+      <button class="ed-tool-btn active" data-tool="transform">
+        <span style="font-size:20px">↔️</span>变换
       </button>
       <button class="ed-tool-btn" data-tool="brush">
         <span style="font-size:20px">🖌️</span>涂抹修复
@@ -186,12 +186,6 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
       <button class="ed-tool-btn" data-tool="transform">
         <span style="font-size:20px">↔️</span>变换
       </button>
-    </div>
-    <!-- 智能选取选项 -->
-    <div class="ed-opts" id="optMagic">
-      <label>容差</label><input type="range" id="magicTol" min="5" max="100" value="30"><span class="val" id="magicTolVal">30</span>
-      <button class="btn btn-glass btn-sm" onclick="edDeleteSelection()">🗑 删除选中</button>
-      <select id="magicMode" style="margin-left:4px"><option value="bg">选背景</option><option value="fg">选主体</option></select>
     </div>
     <!-- 涂抹修复选项 -->
     <div class="ed-opts hide" id="optBrush">
@@ -581,7 +575,7 @@ async function downloadZip(){
 // ===== 编辑模式 =====
 const edOver=$('edOverlay'),edCvs=$('edCanvas'),edCtx=edCvs.getContext('2d');
 let edId=null,edOrig=null,edResult=null,edMaskCvs=null,edMaskCtx=null;
-let edTool='magic'; // magic | brush | remove
+let edTool='transform'; // transform | brush | remove
 let edBrushMode='restore',edBrush=25,edPainting=false,edUndoStack=[];
 let edZoom=1,edPX=0,edPY=0,edPanning=false,edPanStart=null,edShowOrig=false;
 let edSelMask=null; // 选区遮罩（ImageData），非null=有选区
@@ -591,12 +585,11 @@ document.querySelectorAll('.ed-tool-btn').forEach(b=>b.addEventListener('click',
   document.querySelectorAll('.ed-tool-btn').forEach(x=>x.classList.remove('active'));
   this.classList.add('active');edTool=this.dataset.tool;
   edSelMask=null; // 切换工具清选区
-  $('optMagic').classList.toggle('hide',edTool!=='magic');
   $('optBrush').classList.toggle('hide',edTool!=='brush');
   $('optRemove').classList.toggle('hide',edTool!=='remove');
   $('optTransform').classList.toggle('hide',edTool!=='transform');
   if(edTool==='transform')initTransform();
-  $('edHint').textContent=edTool==='magic'?'点击要选取的区域 · 调整容差 · 点删除':edTool==='brush'?'涂抹恢复原图或擦除透明':edTool==='remove'?'涂抹要消除的内容 · 点智能填充':edTool==='transform'?'拖拽角点缩放 · 拖拽↻旋转 · 拖拽内部移动':'';
+  $('edHint').textContent=edTool==='transform'?'拖拽角点缩放 · 拖拽↻旋转 · 拖拽内部移动':edTool==='brush'?'涂抹恢复原图或擦除透明':edTool==='remove'?'涂抹要消除的内容 · 点智能填充':'';
   edCvs.style.cursor=edTool==='transform'?'default':'crosshair';
   renderEd();
 }));
@@ -610,7 +603,7 @@ document.querySelectorAll('.ed-bmode').forEach(b=>b.addEventListener('click',fun
 // ---- 滑块 ----
 $('edBrush').addEventListener('input',function(){edBrush=+this.value;$('edBrushVal').textContent=edBrush+'px'});
 $('removeBrush').addEventListener('input',function(){$('removeBrushVal').textContent=this.value+'px'});
-$('magicTol').addEventListener('input',function(){$('magicTolVal').textContent=this.value});
+// magicTol removed
 
 // ---- 画布事件 ----
 edCvs.addEventListener('mousedown',e=>{
@@ -622,7 +615,6 @@ edCvs.addEventListener('mousedown',e=>{
     if(h){edTfDrag=h;edTfStart={...pos};edTfOrig={...edTf};e.preventDefault();return}
     edPanning=true;edPanStart={x:e.clientX-edPX,y:e.clientY-edPY};return;
   }
-  if(edTool==='magic'){magicWand(pos);return}
   if(edTool==='brush'){edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));edPainting=true;paintAt(pos);}
   if(edTool==='remove'){edPainting=true;paintAt(pos);}
   e.preventDefault();
@@ -641,7 +633,7 @@ edCvs.addEventListener('contextmenu',e=>e.preventDefault());
 // 触摸
 edCvs.addEventListener('touchstart',e=>{
   if(e.touches.length===2){edPanning=true;const mx=(e.touches[0].clientX+e.touches[1].clientX)/2,my=(e.touches[0].clientY+e.touches[1].clientY)/2;edPanStart={x:mx-edPX,y:my-edPY};return}
-  if(e.touches.length===1){const pos=touchPos(e.touches[0]);if(edTool==='magic'){magicWand(pos);return}if(edTool==='brush'){edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));}edPainting=true;paintAt(pos);e.preventDefault()}
+  if(e.touches.length===1){const pos=touchPos(e.touches[0]);if(edTool==='brush'){edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));}edPainting=true;paintAt(pos);e.preventDefault()}
 },{passive:false});
 edCvs.addEventListener('touchmove',e=>{
   if(edPanning&&e.touches.length===2){const mx=(e.touches[0].clientX+e.touches[1].clientX)/2,my=(e.touches[0].clientY+e.touches[1].clientY)/2;edPX=mx-edPanStart.x;edPY=my-edPanStart.y;renderEd();return}
@@ -649,8 +641,8 @@ edCvs.addEventListener('touchmove',e=>{
 },{passive:false});
 edCvs.addEventListener('touchend',()=>{edPainting=false;edPanning=false});
 
-function edPos(e){const r=edCvs.getBoundingClientRect();return{x:(e.clientX-r.left-edPX)/edZoom,y:(e.clientY-r.top-edPY)/edZoom}}
-function touchPos(t){const r=edCvs.getBoundingClientRect();return{x:(t.clientX-r.left-edPX)/edZoom,y:(t.clientY-r.top-edPY)/edZoom}}
+function edPos(e){const r=edCvs.getBoundingClientRect();const sx=edCvs.width/r.width,sy=edCvs.height/r.height;return{x:(e.clientX-r.left)*sx/edZoom-edPX/edZoom*sx,y:(e.clientY-r.top)*sy/edZoom-edPY/edZoom*sy}}
+function touchPos(t){const r=edCvs.getBoundingClientRect();const sx=edCvs.width/r.width,sy=edCvs.height/r.height;return{x:(t.clientX-r.left)*sx/edZoom-edPX/edZoom*sx,y:(t.clientY-r.top)*sy/edZoom-edPY/edZoom*sy}}
 
 // ---- 魔法棒：Flood Fill 选区 ----
 function magicWand(pos){
@@ -985,9 +977,10 @@ async function edOpen(id){
     $('edHint').textContent='🤖 AI 智能识别完成 · 可用涂抹微调边缘';
   }
   edCvs.width=w;edCvs.height=h;
-  edTool='magic';document.querySelectorAll('.ed-tool-btn').forEach(x=>x.classList.remove('active'));
-  document.querySelector('[data-tool="magic"]').classList.add('active');
-  $('optMagic').classList.remove('hide');$('optBrush').classList.add('hide');$('optRemove').classList.add('hide');
+  edTool='transform';document.querySelectorAll('.ed-tool-btn').forEach(x=>x.classList.remove('active'));
+  document.querySelector('[data-tool="transform"]').classList.add('active');
+  $('optBrush').classList.add('hide');$('optRemove').classList.add('hide');$('optTransform').classList.remove('hide');
+  initTransform();
   edOver.classList.add('on');edZoomFit();updateZoomUI();renderEd();
 }
 
