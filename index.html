@@ -183,6 +183,9 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
       <button class="ed-tool-btn" data-tool="remove">
         <span style="font-size:20px">🧹</span>内容消除
       </button>
+      <button class="ed-tool-btn" data-tool="transform">
+        <span style="font-size:20px">↔️</span>变换
+      </button>
     </div>
     <!-- 智能选取选项 -->
     <div class="ed-opts" id="optMagic">
@@ -201,6 +204,13 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
       <label>笔刷</label><input type="range" id="removeBrush" min="5" max="80" value="20"><span class="val" id="removeBrushVal">20px</span>
       <button class="btn btn-glass btn-sm" onclick="edInpaint()">✨ 智能填充</button>
       <button class="btn btn-accent btn-sm" id="btnAiRemove" onclick="edAiInpaint()">🤖 AI 消除</button>
+    </div>
+    <!-- 变换选项 -->
+    <div class="ed-opts hide" id="optTransform">
+      <button class="btn btn-glass btn-sm" onclick="edTransformReset()">🔄 重置</button>
+      <button class="btn btn-glass btn-sm" onclick="edTransformFlipH()">↔ 水平翻转</button>
+      <button class="btn btn-glass btn-sm" onclick="edTransformFlipV()">↕ 垂直翻转</button>
+      <span style="font-size:11px;color:#aaa">拖拽角点缩放 · 拖拽↻旋转 · 拖拽内部移动</span>
     </div>
   </div>
 </div>
@@ -584,7 +594,10 @@ document.querySelectorAll('.ed-tool-btn').forEach(b=>b.addEventListener('click',
   $('optMagic').classList.toggle('hide',edTool!=='magic');
   $('optBrush').classList.toggle('hide',edTool!=='brush');
   $('optRemove').classList.toggle('hide',edTool!=='remove');
-  $('edHint').textContent=edTool==='magic'?'点击要选取的区域 · 调整容差 · 点删除':edTool==='brush'?'涂抹恢复原图或擦除透明':edTool==='remove'?'涂抹要消除的内容 · 点智能填充':'';
+  $('optTransform').classList.toggle('hide',edTool!=='transform');
+  if(edTool==='transform')initTransform();
+  $('edHint').textContent=edTool==='magic'?'点击要选取的区域 · 调整容差 · 点删除':edTool==='brush'?'涂抹恢复原图或擦除透明':edTool==='remove'?'涂抹要消除的内容 · 点智能填充':edTool==='transform'?'拖拽角点缩放 · 拖拽↻旋转 · 拖拽内部移动':'';
+  edCvs.style.cursor=edTool==='transform'?'default':'crosshair';
   renderEd();
 }));
 
@@ -604,6 +617,11 @@ edCvs.addEventListener('mousedown',e=>{
   if(e.button===2){edPanning=true;edPanStart={x:e.clientX-edPX,y:e.clientY-edPY};return}
   if(e.button!==0)return;
   const pos=edPos(e);
+  if(edTool==='transform'){
+    const h=getHandleAt(pos);
+    if(h){edTfDrag=h;edTfStart={...pos};edTfOrig={...edTf};e.preventDefault();return}
+    edPanning=true;edPanStart={x:e.clientX-edPX,y:e.clientY-edPY};return;
+  }
   if(edTool==='magic'){magicWand(pos);return}
   if(edTool==='brush'){edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));edPainting=true;paintAt(pos);}
   if(edTool==='remove'){edPainting=true;paintAt(pos);}
@@ -611,11 +629,12 @@ edCvs.addEventListener('mousedown',e=>{
 });
 edCvs.addEventListener('mousemove',e=>{
   if(edPanning){edPX=e.clientX-edPanStart.x;edPY=e.clientY-edPanStart.y;renderEd();return}
+  if(edTfDrag){edTransformDrag(edPos(e));renderEd();e.preventDefault();return}
   if(edPainting)paintAt(edPos(e));
   renderEd();
   e.preventDefault();
 });
-window.addEventListener('mouseup',()=>{edPainting=false;edPanning=false});
+window.addEventListener('mouseup',()=>{edPainting=false;edPanning=false;edTfDrag=null});
 edCvs.addEventListener('wheel',e=>{e.preventDefault();const r=edCvs.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const ox=(mx-edPX)/edZoom,oy=(my-edPY)/edZoom;edZoom=Math.max(0.2,Math.min(5,edZoom*(e.deltaY>0?0.9:1.1)));edPX=mx-ox*edZoom;edPY=my-oy*edZoom;updateZoomUI();renderEd()});
 edCvs.addEventListener('contextmenu',e=>e.preventDefault());
 
@@ -823,6 +842,88 @@ function paintAt(pos){
   renderEd();
 }
 
+// ---- 变换模式 ----
+let edTf={x:0,y:0,sx:1,sy:1,rot:0}; // 主体变换状态
+let edTfDrag=null,edTfStart={},edTfOrig={};
+
+function initTransform(){
+  const box=getSubjectBounds();
+  edTf={x:box.x-box.w*0.1,y:box.y-box.h*0.1,sx:1,sy:1,rot:0}; // 微调初始位置
+}
+
+function getTfBox(){
+  const box=getSubjectBounds();
+  const cx=box.x+box.w/2,cy=box.y+box.h/2;
+  const w=box.w*edTf.sx,h=box.h*edTf.sy;
+  const rad=edTf.rot*Math.PI/180;
+  const cos=Math.cos(rad),sin=Math.sin(rad);
+  const dx=edTf.x,dy=edTf.y;
+  return{
+    cx:cx+dx,cy:cy+dy,w,h,rad,cos,sin,
+    // 四个角点（变换后）
+    corners:[
+      {x:cx+dx+(-w/2*cos - -h/2*sin),y:cy+dy+(-w/2*sin + -h/2*cos)},
+      {x:cx+dx+(w/2*cos - -h/2*sin), y:cy+dy+(w/2*sin + -h/2*cos)},
+      {x:cx+dx+(w/2*cos - h/2*sin),  y:cy+dy+(w/2*sin + h/2*cos)},
+      {x:cx+dx+(-w/2*cos - h/2*sin), y:cy+dy+(-w/2*sin + h/2*cos)},
+    ]
+  };
+}
+
+function getHandleAt(pos){
+  if(edTool!=='transform')return null;
+  const b=getTfBox();const hSize=12/edZoom;
+  // 检查角点
+  for(let i=0;i<4;i++){const c=b.corners[i];if(Math.hypot(pos.x-c.x,pos.y-c.y)<hSize)return {type:'corner',idx:i};}
+  // 检查旋转把手（顶部中间上方）
+  const top={x:(b.corners[0].x+b.corners[1].x)/2,y:(b.corners[0].y+b.corners[1].y)/2};
+  const rHandle={x:top.x-b.sin*30/edZoom,y:top.y+b.cos*30/edZoom};
+  if(Math.hypot(pos.x-rHandle.x,pos.y-rHandle.y)<hSize)return {type:'rotate'};
+  // 检查边中点
+  for(let i=0;i<4;i++){const c1=b.corners[i],c2=b.corners[(i+1)%4];const m={x:(c1.x+c2.x)/2,y:(c1.y+c2.y)/2};if(Math.hypot(pos.x-m.x,pos.y-m.y)<hSize)return {type:'edge',idx:i};}
+  // 检查是否在包围盒内
+  if(pointInPoly(pos,b.corners))return {type:'move'};
+  return null;
+}
+
+function pointInPoly(p,poly){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a.y>p.y)!==(b.y>p.y)&&p.x<(b.x-a.x)*(p.y-a.y)/(b.y-a.y)+a.x)inside=!inside}
+  return inside;
+}
+
+function edTransformDrag(pos){
+  const dx=pos.x-edTfStart.x,dy=pos.y-edTfStart.y;
+  if(edTfDrag.type==='move'){edTf.x=edTfOrig.x+dx;edTf.y=edTfOrig.y+dy}
+  else if(edTfDrag.type==='corner'){
+    const idx=edTfDrag.idx;
+    const box=getSubjectBounds();const cx=box.cx-box.x-box.w/2,cy=box.cy-box.y-box.h/2;
+    const dist=Math.hypot(dx,dy);
+    const angle=Math.atan2(dy,dx);
+    // 根据角的对角线方向决定缩放
+    const signs=[[-1,-1],[1,-1],[1,1],[-1,1]];
+    const s=signs[idx];
+    edTf.sx=Math.max(0.1,edTfOrig.sx+s[0]*dist/100);
+    edTf.sy=Math.max(0.1,edTfOrig.sy+s[1]*dist/100);
+  }else if(edTfDrag.type==='edge'){
+    const idx=edTfDrag.idx;
+    const dirs=[[0,-1],[1,0],[0,1],[-1,0]];
+    const d=dirs[idx];
+    edTf.sx=Math.max(0.1,edTfOrig.sx+d[0]*dx/100);
+    edTf.sy=Math.max(0.1,edTfOrig.sy+d[1]*dy/100);
+  }else if(edTfDrag.type==='rotate'){
+    const box=getSubjectBounds();const cx=box.cx,cy=box.cy;
+    const a1=Math.atan2(edTfStart.y-cy,edTfStart.x-cx);
+    const a2=Math.atan2(pos.y-cy,pos.x-cx);
+    const da=(a2-a1)*180/Math.PI;
+    edTf.rot=((edTfOrig.rot+da)%360+360)%360;
+  }
+}
+
+function edTransformReset(){edTf={x:0,y:0,sx:1,sy:1,rot:0};renderEd()}
+function edTransformFlipH(){edTf.sx*=-1;renderEd()}
+function edTransformFlipV(){edTf.sy*=-1;renderEd()}
+
 // ---- 视图 ----
 function edToggleView(){edShowOrig=!edShowOrig;$('edViewBtn').textContent=edShowOrig?'🔄 结果':'🔄 原图';renderEd()}
 function edZoomIn(){
@@ -896,7 +997,23 @@ async function edSave(){
   if(!edId)return;const job=jobs.get(edId);
   const w=edCvs.width,h=edCvs.height;
   const out=document.createElement('canvas');out.width=w;out.height=h;
-  const octx=out.getContext('2d');octx.drawImage(edResult,0,0);
+  const octx=out.getContext('2d');
+
+  // 应用变换
+  const box=getSubjectBounds();
+  const tf=edTool==='transform'?edTf:{x:0,y:0,sx:1,sy:1,rot:0};
+  octx.save();
+  octx.translate(box.cx+tf.x,box.cy+tf.y);
+  octx.rotate(tf.rot*Math.PI/180);
+  octx.scale(tf.sx,tf.sy);
+  octx.translate(-box.cx,-box.cy);
+  octx.drawImage(edResult,0,0);
+  octx.restore();
+
+  // 补回非主体区域（透明部分原样保留）
+  const full=document.createElement('canvas');full.width=w;full.height=h;
+  const fctx=full.getContext('2d');fctx.drawImage(edResult,0,0);
+
   const idata=octx.getImageData(0,0,w,h);
   const mdata=edMaskCtx.getImageData(0,0,w,h);
   const oc=document.createElement('canvas');oc.width=w;oc.height=h;
@@ -929,6 +1046,39 @@ function renderEd(){
   }
   // 选区覆盖层（红色半透明）
   if(edSelMask){const od=edCtx.getImageData(0,0,w,h);for(let i=0;i<edSelMask.length;i+=4){if(edSelMask[i+3]>0){od.data[i]=Math.min(255,od.data[i]*0.3+180);od.data[i+1]=Math.min(255,od.data[i+1]*0.3);od.data[i+2]=Math.min(255,od.data[i+2]*0.3);od.data[i+3]=255}}edCtx.putImageData(od,0,0)}
+
+  // 变换模式：绘制变换后的主体 + 控制手柄
+  if(edTool==='transform'&&!edShowOrig){
+    const box=getSubjectBounds();
+    edCtx.save();
+    edCtx.translate(box.cx,box.cy);
+    edCtx.rotate(box.rad);
+    edCtx.scale(edTf.sx,edTf.sy);
+    edCtx.translate(-box.cx,-box.cy);
+    // 重绘结果图（变换后）
+    const cs2=8/edZoom;
+    for(let y=box.y;y<box.y+box.h;y+=cs2)for(let x=box.x;x<box.x+box.w;x+=cs2){
+      edCtx.fillStyle=((Math.floor(x/cs2)+Math.floor(y/cs2))%2===0)?'#ddd':'#fff';
+      edCtx.fillRect(x,y,cs2+1,cs2+1);
+    }
+    edCtx.globalAlpha=0.6;edCtx.drawImage(edResult,0,0);edCtx.globalAlpha=1;
+    edCtx.restore();
+
+    // 控制手柄
+    const b=getTfBox();
+    edCtx.strokeStyle='#5b9cf5';edCtx.lineWidth=2/edZoom;edCtx.setLineDash([6/edZoom,3/edZoom]);
+    edCtx.beginPath();for(let i=0;i<4;i++){const c=b.corners[i];edCtx[i===0?'moveTo':'lineTo'](c.x,c.y)}edCtx.closePath();edCtx.stroke();
+    edCtx.setLineDash([]);
+    // 角点
+    for(const c of b.corners){edCtx.fillStyle='#fff';edCtx.strokeStyle='#5b9cf5';edCtx.lineWidth=2/edZoom;edCtx.beginPath();edCtx.arc(c.x,c.y,6/edZoom,0,Math.PI*2);edCtx.fill();edCtx.stroke()}
+    // 旋转把手
+    const top={x:(b.corners[0].x+b.corners[1].x)/2,y:(b.corners[0].y+b.corners[1].y)/2};
+    const rh={x:top.x-b.sin*25/edZoom,y:top.y+b.cos*25/edZoom};
+    edCtx.strokeStyle='#f59e0b';edCtx.lineWidth=2/edZoom;
+    edCtx.beginPath();edCtx.moveTo(top.x,top.y);edCtx.lineTo(rh.x,rh.y);edCtx.stroke();
+    edCtx.fillStyle='#f59e0b';edCtx.beginPath();edCtx.arc(rh.x,rh.y,6/edZoom,0,Math.PI*2);edCtx.fill();
+  }
+
   edCtx.restore();
 }
 
