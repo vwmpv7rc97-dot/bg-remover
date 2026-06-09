@@ -654,6 +654,7 @@ const edOver=$('edOverlay'),edCvs=$('edCanvas'),edCtx=edCvs.getContext('2d');
 let edId=null,edOrig=null,edResult=null,edMaskCvs=null,edMaskCtx=null;
 let edTool='move'; // move | brush | remove
 let edMoveX=0,edMoveY=0,edMoveScale=1;
+let edSubjectBox=null; // 缓存主体包围盒，避免每帧扫描
 let edBrushMode='restore',edBrush=25,edPainting=false,edUndoStack=[];
 let edZoom=1,edPX=0,edPY=0,edPanning=false,edPanStart=null,edShowOrig=false;
 let edSelMask=null; // 选区遮罩（ImageData），非null=有选区
@@ -1058,7 +1059,7 @@ async function onSharpChange(){
   const blob=await sharpenBlob(edSharpBase,lvl);
   if(job.resultUrl)URL.revokeObjectURL(job.resultUrl);
   job.resultBlob=blob;job.resultUrl=URL.createObjectURL(blob);
-  edResult=await loadImage(job.resultUrl);renderEd();
+  edResult=await loadImage(job.resultUrl);edSubjectBox=null;renderEd();
 }
 async function sharpCompare(on){
   if(!edSharpBaseImg)return;
@@ -1068,7 +1069,7 @@ async function sharpCompare(on){
 function updateZoomUI(){$('edZoomVal').textContent=Math.round(edZoom*100)+'%'}
 function edScaleUp(){edMoveScale=Math.min(5,edMoveScale*1.1);$('edScaleVal').textContent=Math.round(edMoveScale*100)+'%';renderEd()}
 function edScaleDown(){edMoveScale=Math.max(0.1,edMoveScale/1.1);$('edScaleVal').textContent=Math.round(edMoveScale*100)+'%';renderEd()}
-function edMoveReset(){edMoveX=0;edMoveY=0;edMoveScale=1;$('edScaleVal').textContent='100%';renderEd()}
+function edMoveReset(){edMoveX=0;edMoveY=0;edMoveScale=1;edSubjectBox=null;$('edScaleVal').textContent='100%';renderEd()}
 let edRegions=[]; // 多区域数据 [{mask,color,bounds}]
 let edRegionMode=false;
 
@@ -1176,7 +1177,7 @@ async function edOpen(id){
     $('edHint').textContent='🤖 AI 智能识别完成 · 可用涂抹微调边缘';
   }
   edCvs.width=w;edCvs.height=h;
-  edTool='move';edMoveX=0;edMoveY=0;edMoveScale=1;$('edScaleVal').textContent='100%';
+  edTool='move';edMoveX=0;edMoveY=0;edMoveScale=1;edSubjectBox=null;$('edScaleVal').textContent='100%';
   document.querySelectorAll('.ed-tool-btn').forEach(x=>x.classList.remove('active'));
   document.querySelector('[data-tool="move"]').classList.add('active');
   $('optMove').classList.remove('hide');$('optBrush').classList.add('hide');$('optRemove').classList.add('hide');
@@ -1228,47 +1229,21 @@ function renderEd(){
     // 棋盘格背景
     const cs=10/edZoom;
     for(let y=0;y<h;y+=cs)for(let x=0;x<w;x+=cs){edCtx.fillStyle=((Math.floor(x/cs)+Math.floor(y/cs))%2===0)?'#ddd':'#fff';edCtx.fillRect(x,y,cs+1,cs+1)}
-    // 主体渲染：应用 move/scale 变换
+    // 主体渲染：应用 move/scale 变换（缓存包围盒）
+    if(!edSubjectBox)edSubjectBox=getSubjectBounds();
     edCtx.save();
-    // 计算主体中心
-    const box=getSubjectBounds();const scx=box.x+box.w/2,scy=box.y+box.h/2;
-    edCtx.translate(scx+edMoveX,scy+edMoveY);
-    edCtx.scale(edMoveScale,edMoveScale);
-    edCtx.translate(-scx,-scy);
+    const box=edSubjectBox;const scx=box.x+box.w/2,scy=box.y+box.h/2;
+    edCtx.translate(scx+edMoveX,scy+edMoveY);edCtx.scale(edMoveScale,edMoveScale);edCtx.translate(-scx,-scy);
     edCtx.drawImage(edResult,0,0);
-    // 红色半透明蒙版（标识主体范围）
-    edCtx.globalCompositeOperation='source-atop';
-    edCtx.fillStyle='rgba(255,50,50,0.15)';edCtx.fillRect(0,0,w,h);
-    edCtx.globalCompositeOperation='source-over';
     edCtx.restore();
-    // 遮罩恢复
-    if(edMaskCvs){const od=edCtx.getImageData(0,0,w,h);const md=edMaskCtx.getImageData(0,0,w,h);const oc=document.createElement('canvas');oc.width=w;oc.height=h;const ox=oc.getContext('2d');ox.drawImage(edOrig,0,0);const origD=ox.getImageData(0,0,w,h);
-    for(let i=0;i<md.data.length;i+=4){if(md.data[i]>128){od.data[i]=origD.data[i];od.data[i+1]=origD.data[i+1];od.data[i+2]=origD.data[i+2];od.data[i+3]=255}}
-    edCtx.putImageData(od,0,0)}
-  }
-  // 多区域覆盖层
-  if(edRegionMode&&edRegions.length){
-    const od=edCtx.getImageData(0,0,w,h);
-    for(const reg of edRegions){
-      const [r8,g8,b8]=hexToRgb(reg.color);
-      for(const[px,py]of reg.pixels){
-        const i=(py*w+px)*4;
-        od.data[i]=Math.min(255,od.data[i]*0.3+r8*0.7);od.data[i+1]=Math.min(255,od.data[i+1]*0.3+g8*0.7);od.data[i+2]=Math.min(255,od.data[i+2]*0.3+b8*0.7);
-        if(reg.removed){od.data[i+3]=60}else{od.data[i+3]=255}
-      }
-    }
-    edCtx.putImageData(od,0,0);
-    // 区域标签
-    edCtx.font=`${12/edZoom}px system-ui`;edCtx.textAlign='center';
-    for(let i=0;i<edRegions.length;i++){
-      const r=edRegions[i];if(r.removed)continue;
-      edCtx.fillStyle=r.color;edCtx.fillText(`${i+1}`,r.bounds.x+r.bounds.w/2,r.bounds.y-4/edZoom);
+    // 遮罩恢复（只在有 mask 变更时处理）
+    if(edMaskCvs){
+      const od=edCtx.getImageData(0,0,w,h);const md=edMaskCtx.getImageData(0,0,w,h);
+      const oc=document.createElement('canvas');oc.width=w;oc.height=h;const ox=oc.getContext('2d');ox.drawImage(edOrig,0,0);const origD=ox.getImageData(0,0,w,h);
+      for(let i=0;i<md.data.length;i+=4){if(md.data[i]>128){od.data[i]=origD.data[i];od.data[i+1]=origD.data[i+1];od.data[i+2]=origD.data[i+2];od.data[i+3]=255}}
+      edCtx.putImageData(od,0,0);
     }
   }
-
-  // 选区覆盖层（红色半透明）
-  if(edSelMask){const od=edCtx.getImageData(0,0,w,h);for(let i=0;i<edSelMask.length;i+=4){if(edSelMask[i+3]>0){od.data[i]=Math.min(255,od.data[i]*0.3+180);od.data[i+1]=Math.min(255,od.data[i+1]*0.3);od.data[i+2]=Math.min(255,od.data[i+2]*0.3);od.data[i+3]=255}}edCtx.putImageData(od,0,0)}
-
   edCtx.restore();
 }
 
