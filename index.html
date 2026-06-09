@@ -278,7 +278,7 @@
     <div class="editor-tools">
       <button class="btn btn-glass btn-sm ed-mode active" data-mode="restore" id="modeRestore">🖌️ 恢复</button>
       <button class="btn btn-glass btn-sm ed-mode" data-mode="erase" id="modeErase">🧹 擦除</button>
-      <button class="btn btn-glass btn-sm ed-mode" data-mode="circle" id="modeCircle">⭕ 圈选AI</button>
+      <button class="btn btn-glass btn-sm ed-mode" data-mode="lasso" id="modeLasso">✏️ 套索AI</button>
       <span class="ed-sep">|</span>
       <span class="ed-label">笔刷</span>
       <input type="range" id="brushSize" min="5" max="120" value="30" class="brush-slider">
@@ -664,11 +664,11 @@ let editOrigImg = null;    // 原始图 Image
 let editResultImg = null;  // 抠图结果 Image
 let editMaskCvs = null;    // 遮罩 canvas（0=透明/结果, 255=原图）
 let editMaskCtx = null;
-let editMode = 'restore';  // restore | erase | circle
+let editMode = 'restore';  // restore | erase | lasso
 let editBrushSize = 30;
 let editPainting = false;
-let editCircleStart = null;
-let editCircleEnd = null;
+let editLassoPts = [];     // 套索路径点
+let editLassoActive = false;
 let editUndoStack = [];
 let editZoom = 1;
 let editPanX = 0, editPanY = 0;
@@ -685,16 +685,16 @@ document.querySelectorAll('.ed-mode').forEach(b => {
     document.querySelectorAll('.ed-mode').forEach(x => x.classList.remove('active'));
     b.classList.add('active');
     editMode = b.dataset.mode;
-    editCircleStart = editCircleEnd = null;
-    $('btnAiRetry').style.display = editMode === 'circle' ? '' : 'none';
+    editLassoPts = []; editLassoActive = false;
+    $('btnAiRetry').style.display = editMode === 'lasso' ? '' : 'none';
     editorHint.textContent = editMode === 'restore' ? '🖌️ 恢复模式：涂抹处恢复为原图' :
                              editMode === 'erase' ? '🧹 擦除模式：涂抹处变透明' :
-                             '⭕ 圈选模式：在图上拖拽画圈，然后点 AI重试';
-    editorCanvas.style.cursor = editMode === 'circle' ? 'crosshair' : 'crosshair';
+                             '✏️ 套索模式：按住拖拽画出选区，松手自动闭合，AI 智能识别边缘';
+    editorCanvas.style.cursor = 'crosshair';
     renderEditor();
   });
 });
-$('btnAiRetry').addEventListener('click', () => aiRetryCircle());
+$('btnAiRetry').addEventListener('click', () => aiRetryLasso());
 
 // 画布事件
 editorCanvas.addEventListener('mousedown', e => { editorMouseDown(e); e.preventDefault(); });
@@ -714,7 +714,7 @@ window._editOpen = async function(id) {
   editJobId = id;
   editUndoStack = [];
   editZoom = 1; editPanX = 0; editPanY = 0;
-  editCircleStart = editCircleEnd = null;
+  editLassoPts = []; editLassoActive = false;
 
   // 加载原图和结果
   const loadImg = src => new Promise((resolve, reject) => {
@@ -811,15 +811,24 @@ function renderEditor() {
     }
     ctx.putImageData(idata, 0, 0);
   }
-  // 圈选提示
-  if (editMode === 'circle' && editCircleStart && editCircleEnd) {
-    const cx = (editCircleStart.x + editCircleEnd.x) / 2;
-    const cy = (editCircleStart.y + editCircleEnd.y) / 2;
-    const r = Math.hypot(editCircleEnd.x - editCircleStart.x, editCircleEnd.y - editCircleStart.y) / 2;
+  // 套索路径
+  if (editMode === 'lasso' && editLassoPts.length > 1) {
     ctx.strokeStyle = '#5b9cf5'; ctx.lineWidth = 2 / editZoom;
     ctx.setLineDash([6 / editZoom, 4 / editZoom]);
-    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(editLassoPts[0].x, editLassoPts[0].y);
+    for (let i = 1; i < editLassoPts.length; i++) {
+      ctx.lineTo(editLassoPts[i].x, editLassoPts[i].y);
+    }
+    if (editLassoActive) {
+      // 画线到鼠标位置
+      ctx.lineTo(editLassoPts[editLassoPts.length-1].x, editLassoPts[editLassoPts.length-1].y);
+    }
+    ctx.stroke();
     ctx.setLineDash([]);
+    // 起点小圆
+    ctx.fillStyle = '#5b9cf5';
+    ctx.beginPath(); ctx.arc(editLassoPts[0].x, editLassoPts[0].y, 4 / editZoom, 0, Math.PI*2); ctx.fill();
   }
   ctx.restore();
 }
@@ -835,21 +844,25 @@ function canvasToImage(pos) {
 function editorMouseDown(e) {
   if (e.button === 2) { editPanning = true; editPanStart = { x: e.clientX - editPanX, y: e.clientY - editPanY }; return; }
   if (e.button !== 0) return;
-  if (editMode === 'circle') {
-    editCircleStart = canvasToImage(e);
-    editCircleEnd = null;
+  if (editMode === 'lasso') {
+    editLassoActive = true;
+    editLassoPts = [canvasToImage(e)];
     return;
   }
   editPainting = true;
-  // 保存撤销
   if (editMaskCvs) editUndoStack.push(editMaskCtx.getImageData(0, 0, editMaskCvs.width, editMaskCvs.height));
   paintBrush(canvasToImage(e));
 }
 
 function editorMouseMove(e) {
   if (editPanning) { editPanX = e.clientX - editPanStart.x; editPanY = e.clientY - editPanStart.y; renderEditor(); return; }
-  if (editMode === 'circle' && editCircleStart) {
-    editCircleEnd = canvasToImage(e);
+  if (editMode === 'lasso' && editLassoActive) {
+    const pt = canvasToImage(e);
+    const last = editLassoPts[editLassoPts.length - 1];
+    // 间隔采样减少点数
+    if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) > 5) {
+      editLassoPts.push(pt);
+    }
     renderEditor();
     return;
   }
@@ -857,6 +870,16 @@ function editorMouseMove(e) {
 }
 
 function editorMouseUp() {
+  if (editMode === 'lasso' && editLassoActive && editLassoPts.length > 2) {
+    editLassoActive = false;
+    // 自动闭合：连接到起点
+    if (editLassoPts.length > 2) {
+      editLassoPts.push({ ...editLassoPts[0] });
+      renderEditor();
+      // 自动触发 AI
+      aiRetryLasso();
+    }
+  }
   editPainting = false;
   editPanning = false;
 }
@@ -871,54 +894,103 @@ function paintBrush(pos) {
   renderEditor();
 }
 
-async function aiRetryCircle() {
-  if (!editCircleStart || !editCircleEnd || !editOrigImg || !editJobId) return;
-  const cx = Math.round((editCircleStart.x + editCircleEnd.x) / 2);
-  const cy = Math.round((editCircleStart.y + editCircleEnd.y) / 2);
-  const r = Math.round(Math.hypot(editCircleEnd.x - editCircleStart.x, editCircleEnd.y - editCircleStart.y) / 2);
-  if (r < 10) { alert('圈选区域太小，请画大一点'); return; }
+function isInsideLasso(x, y, pts) {
+  // 射线法判断点是否在多边形内
+  let inside = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const xi = pts[i].x, yi = pts[i].y;
+    const xj = pts[j].x, yj = pts[j].y;
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+async function aiRetryLasso() {
+  if (editLassoPts.length < 3 || !editOrigImg || !editJobId) return;
 
   const w = editOrigImg.naturalWidth, h = editOrigImg.naturalHeight;
-  // 裁剪圈选区域
-  const sx = Math.max(0, cx - r), sy = Math.max(0, cy - r);
-  const sw = Math.min(w - sx, r * 2), sH = Math.min(h - sy, r * 2);
+
+  // 计算套索包围盒（加 20px padding）
+  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+  for (const p of editLassoPts) {
+    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
+    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
+  }
+  const pad = 20;
+  const sx = Math.max(0, Math.floor(minX) - pad);
+  const sy = Math.max(0, Math.floor(minY) - pad);
+  const sw = Math.min(w - sx, Math.ceil(maxX - minX) + pad * 2);
+  const sH = Math.min(h - sy, Math.ceil(maxY - minY) + pad * 2);
+
+  if (sw < 20 || sH < 20) { alert('选区太小'); editLassoPts = []; renderEditor(); return; }
+
+  // 创建套索遮罩（白色=套索内，黑色=外）
+  const maskCvs = document.createElement('canvas'); maskCvs.width = sw; maskCvs.height = sH;
+  const maskCtx2 = maskCvs.getContext('2d');
+  // 偏移套索坐标到裁剪区域
+  const localPts = editLassoPts.map(p => ({ x: p.x - sx, y: p.y - sy }));
+  maskCtx2.fillStyle = '#fff';
+  maskCtx2.beginPath();
+  maskCtx2.moveTo(localPts[0].x, localPts[0].y);
+  for (let i = 1; i < localPts.length; i++) maskCtx2.lineTo(localPts[i].x, localPts[i].y);
+  maskCtx2.fill();
+
+  // 裁剪原图
   const cropCvs = document.createElement('canvas'); cropCvs.width = sw; cropCvs.height = sH;
   const cropCtx = cropCvs.getContext('2d');
   cropCtx.drawImage(editOrigImg, sx, sy, sw, sH, 0, 0, sw, sH);
+
+  // 将套索外区域涂黑（帮助 AI 聚焦）
+  const cropData = cropCtx.getImageData(0, 0, sw, sH);
+  const maskData = maskCtx2.getImageData(0, 0, sw, sH);
+  for (let i = 0; i < cropData.data.length; i += 4) {
+    if (maskData.data[i] < 128) {
+      cropData.data[i] = cropData.data[i+1] = cropData.data[i+2] = 0;
+    }
+  }
+  cropCtx.putImageData(cropData, 0, 0);
   const cropBlob = await new Promise(res => cropCvs.toBlob(res, 'image/png'));
 
-  editorHint.textContent = '🤖 AI 处理圈选区域中…';
+  editorHint.textContent = '🤖 AI 识别套索区域边缘中…';
   try {
     const aiBlob = await removeBackgroundFn(cropBlob, { output: { format: 'image/png' } });
     const aiImg = await new Promise((resolve, reject) => {
       const img = new Image(); img.onload = () => resolve(img); img.onerror = reject;
       img.src = URL.createObjectURL(aiBlob);
     });
-    // 将 AI 结果合成回遮罩
+
+    // 将 AI 结果合成回去
     editUndoStack.push(editMaskCtx.getImageData(0, 0, editMaskCvs.width, editMaskCvs.height));
-    // 创建圆形遮罩：圈内 AI 结果替代
+
     const tmpCvs = document.createElement('canvas'); tmpCvs.width = sw; tmpCvs.height = sH;
     const tmpCtx = tmpCvs.getContext('2d');
     tmpCtx.drawImage(aiImg, 0, 0);
     const aiData = tmpCtx.getImageData(0, 0, sw, sH);
-    const maskData = editMaskCtx.getImageData(sx, sy, sw, sH);
+
+    // 更新遮罩：套索区域内，AI 认为不透明的地方 → mask=0（保留AI结果/透明）
+    //           套索区域内，AI 认为透明的地方 → 保持原样
+    const editMaskData = editMaskCtx.getImageData(sx, sy, sw, sH);
     for (let dy = 0; dy < sH; dy++) {
       for (let dx = 0; dx < sw; dx++) {
+        const idx = (dy * sw + dx) * 4;
         const gx = sx + dx, gy = sy + dy;
-        const dist = Math.hypot(gx - cx, gy - cy);
-        if (dist <= r) {
-          const idx = (dy * sw + dx) * 4;
-          // AI 结果透明 → mask=0（擦除），不透明 → mask=0（保持结果）
-          maskData.data[idx] = aiData.data[idx + 3] < 128 ? 0 : 0;
+        if (isInsideLasso(gx, gy, editLassoPts)) {
+          // AI 结果：透明→擦除原图(mask=0)，不透明→保留原样(mask=保持不变)
+          if (aiData.data[idx + 3] < 64) {
+            editMaskData.data[idx] = 0; // 擦除
+          }
+          // 否则保持不变（AI 认为这里有物体）
         }
       }
     }
-    editMaskCtx.putImageData(maskData, sx, sy);
+    editMaskCtx.putImageData(editMaskData, sx, sy);
     editorHint.textContent = '✅ AI 处理完成 · 可继续编辑或保存';
   } catch (e) {
     editorHint.textContent = '❌ AI 处理失败：' + e.message;
   }
-  editCircleStart = editCircleEnd = null;
+  editLassoPts = [];
   renderEditor();
 }
 </script>
