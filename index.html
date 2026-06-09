@@ -256,24 +256,64 @@ document.addEventListener('paste', e => {
   if (files.length) { e.preventDefault(); handleFiles(files); }
 });
 
-// ===== 加载引擎（仅 npmmirror，12 秒超时） =====
-(async function boot() {
-  const url = 'https://registry.npmmirror.com/@imgly/background-removal/1.6.0/files/dist/index.mjs';
-  statusText.textContent = '正在从 npmmirror（阿里镜像）加载引擎…';
+// ===== 并行竞速加载引擎（6 个源同时尝试，谁快用谁） =====
+const ENGINE_SOURCES = [
+  'https://registry.npmmirror.com/@imgly/background-removal/1.6.0/files/dist/index.mjs',
+  'https://esm.sh/@imgly/background-removal@1.6.0',
+  'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.6.0/dist/index.mjs',
+  'https://unpkg.com/@imgly/background-removal@1.6.0/dist/index.mjs',
+  'https://cdn.skypack.dev/@imgly/background-removal@1.6.0',
+  'https://fastly.jsdelivr.net/npm/@imgly/background-removal@1.6.0/dist/index.mjs',
+];
+
+async function tryOneImport(url, timeoutMs) {
+  // 方案A：直接 import（需要 CORS）
   try {
     const mod = await Promise.race([
       import(url),
-      new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 12000))
+      new Promise((_, r) => setTimeout(() => r(new Error()), timeoutMs))
     ]);
-    removeBgFn = mod.removeBackground;
+    if (mod.removeBackground) return mod;
+  } catch (e) {}
+  // 方案B：fetch 源码 → Blob URL → import（绕过部分CORS问题）
+  try {
+    const resp = await Promise.race([
+      fetch(url, { mode: 'cors' }),
+      new Promise((_, r) => setTimeout(() => r(new Error()), timeoutMs))
+    ]);
+    if (resp.ok) {
+      const source = await resp.text();
+      const blob = new Blob([source], { type: 'application/javascript' });
+      const blobUrl = URL.createObjectURL(blob);
+      const mod = await import(blobUrl);
+      URL.revokeObjectURL(blobUrl);
+      if (mod.removeBackground) return mod;
+    }
+  } catch (e) {}
+  return null;
+}
+
+(async function boot() {
+  statusText.textContent = '并行连接 6 个 CDN 加载引擎…';
+  statusDot.className = 'dot';
+
+  // 所有源同时出发，8 秒超时
+  const results = await Promise.allSettled(
+    ENGINE_SOURCES.map(url => tryOneImport(url, 8000))
+  );
+
+  const winner = results.find(r => r.status === 'fulfilled' && r.value);
+  if (winner) {
+    removeBgFn = winner.value.removeBackground;
     statusDot.className = 'dot';
-    statusText.textContent = '引擎就绪 · 模型将在首次抠图时自动下载';
-    // 处理排队
+    statusText.textContent = '引擎就绪 · 模型将在首次抠图时下载';
     flushQueue();
-  } catch (e) {
-    statusDot.className = 'dot err';
-    statusText.textContent = '引擎加载失败，请检查网络或刷新重试（使用阿里 npm 镜像）';
+    return;
   }
+
+  // 全部失败
+  statusDot.className = 'dot err';
+  statusText.textContent = '所有 CDN 均无法连接。可尝试：1) 切换 WiFi/4G 2) 使用代理 3) 刷新重试';
 })();
 
 // ===== 排队机制 =====
