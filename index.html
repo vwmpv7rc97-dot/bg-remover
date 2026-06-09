@@ -4,227 +4,84 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <title>批量抠图 · 液态玻璃工坊</title>
-
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="批量抠图">
 <meta name="theme-color" content="#0f0f1a">
-
 <style>
-  *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+:root{--bg:#0f0f1a;--glass:rgba(255,255,255,0.06);--glass-border:rgba(255,255,255,0.08);--text:#e8e8ed;--text-secondary:#9494a8;--accent:#5b9cf5;--success:#34d399;--error:#f87171;--warning:#fbbf24;--radius:20px;--radius-sm:12px;--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px)}
+body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);background-image:radial-gradient(ellipse at 50% 0%,rgba(91,156,245,0.06) 0%,transparent 60%),radial-gradient(ellipse at 80% 80%,rgba(139,92,246,0.04) 0%,transparent 50%);color:var(--text);min-height:100dvh;-webkit-tap-highlight-color:transparent;padding:20px;padding-top:calc(20px + var(--safe-t));padding-bottom:calc(20px + var(--safe-b))}
+.container{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
+header{text-align:center;padding:8px 0}
+header h1{font-size:clamp(22px,5vw,34px);font-weight:700;letter-spacing:.04em;background:linear-gradient(135deg,#e8e8ed 0%,#5b9cf5 50%,#a78bfa 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+header p{font-size:13px;color:var(--text-secondary);margin-top:6px}
+.upload-zone{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:2px dashed var(--glass-border);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;transition:all .3s}
+.upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:rgba(255,255,255,0.08)}
+.upload-zone .icon{font-size:36px;margin-bottom:10px}
+.upload-zone .label{font-size:15px;font-weight:600;letter-spacing:.04em}
+.upload-zone .hint{font-size:12px;color:var(--text-secondary);margin-top:5px;line-height:1.5}
+.upload-zone input{display:none}
+.status-bar{background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px 16px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-secondary)}
+.status-bar .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.status-bar .dot.err{background:var(--error)}
+.status-bar .txt{flex:1}
+.size-row{background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary)}
+.size-row input{width:72px;padding:6px 8px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(0,0,0,.3);color:var(--text);font-size:13px;font-family:inherit;text-align:center;outline:none}
+.size-row input:focus{border-color:var(--accent)}
+.toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.btn{padding:10px 18px;border-radius:var(--radius-sm);border:none;font-size:13px;font-weight:590;cursor:pointer;letter-spacing:.04em;font-family:inherit;transition:all .2s;white-space:nowrap}
+.btn-glass{background:var(--glass);color:var(--text);border:1px solid var(--glass-border)}
+.btn-glass:hover{background:rgba(255,255,255,0.08);transform:translateY(-1px)}
+.btn-glass:active{transform:scale(.97)}
+.btn-glass:disabled{opacity:.35;pointer-events:none}
+.btn-accent{background:var(--accent);color:#fff;box-shadow:0 4px 20px rgba(91,156,245,0.3)}
+.btn-accent:hover{transform:translateY(-1px)}
+.btn-accent:active{transform:scale(.97)}
+.btn-accent:disabled{opacity:.35;pointer-events:none}
+.btn-danger{background:rgba(248,113,113,0.15);color:var(--error);border:1px solid rgba(248,113,113,0.2)}
+.btn-danger:hover{background:rgba(248,113,113,0.25)}
+.btn-sm{padding:6px 14px;font-size:12px;border-radius:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+.grid:empty{display:none}
+.grid:empty~.empty-state{display:flex}
+.empty-state{display:none;flex-direction:column;align-items:center;padding:50px 20px;color:var(--text-secondary);text-align:center}
+.empty-state .icon{font-size:44px;margin-bottom:10px;opacity:.5}
+.empty-state p{font-size:13px;line-height:1.6}
+.card{background:var(--glass);backdrop-filter:blur(30px);border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px;transition:all .3s}
+.card:hover{border-color:rgba(255,255,255,.14);transform:translateY(-2px)}
+.card.done{border-color:rgba(52,211,153,.15)}
+.card.error{border-color:rgba(248,113,113,.2)}
+.card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.card-name{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+.card-badge{font-size:10px;padding:2px 8px;border-radius:20px;letter-spacing:.04em;flex-shrink:0}
+.badge-pending{background:rgba(148,148,168,.12);color:var(--text-secondary)}
+.badge-downloading{background:rgba(251,191,36,.1);color:var(--warning)}
+.badge-processing{background:rgba(91,156,245,.1);color:var(--accent)}
+.badge-done{background:rgba(52,211,153,.1);color:var(--success)}
+.badge-error{background:rgba(248,113,113,.1);color:var(--error)}
+.card-compare{display:flex;gap:6px}
+.card-img-wrap{flex:1;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;position:relative}
+.card-img-wrap img{width:100%;height:100%;object-fit:contain;position:absolute;inset:0}
+.card-img-wrap .placeholder{font-size:11px;color:var(--text-secondary);text-align:center;padding:6px}
+.card-img-wrap.final{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='10' height='10' fill='%23ffffff10'/%3E%3Crect x='10' y='10' width='10' height='10' fill='%23ffffff10'/%3E%3C/svg%3E")}
+.card-progress{height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
+.card-progress-bar{height:100%;background:var(--accent);border-radius:2px;transition:width .3s;width:0%}
+.card-progress-bar.done{background:var(--success)}
+.card-progress-bar.error{background:var(--error)}
+.card-status-text{font-size:10px;color:var(--text-secondary)}
+.card-actions{display:flex;gap:6px;justify-content:flex-end}
+.card-error-msg{font-size:10px;color:var(--error);line-height:1.4}
 
-  :root{
-    --bg:#0f0f1a;
-    --glass:rgba(255,255,255,0.06);
-    --glass-border:rgba(255,255,255,0.08);
-    --text:#e8e8ed;
-    --text-secondary:#9494a8;
-    --accent:#5b9cf5;
-    --accent-glow:rgba(91,156,245,0.3);
-    --success:#34d399;
-    --error:#f87171;
-    --warning:#fbbf24;
-    --radius:20px;
-    --radius-sm:12px;
-    --safe-b:env(safe-area-inset-bottom,0px);
-    --safe-t:env(safe-area-inset-top,0px);
-  }
-
-  body{
-    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;
-    background:var(--bg);
-    background-image:
-      radial-gradient(ellipse at 50% 0%,rgba(91,156,245,0.06) 0%,transparent 60%),
-      radial-gradient(ellipse at 80% 80%,rgba(139,92,246,0.04) 0%,transparent 50%);
-    color:var(--text);
-    min-height:100vh;min-height:100dvh;
-    -webkit-tap-highlight-color:transparent;
-    padding:20px;padding-top:calc(20px + var(--safe-t));padding-bottom:calc(20px + var(--safe-b));
-  }
-
-  .container{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
-
-  /* Header */
-  header{text-align:center;padding:8px 0}
-  header h1{font-size:clamp(22px,5vw,34px);font-weight:700;letter-spacing:.04em;
-    background:linear-gradient(135deg,#e8e8ed 0%,#5b9cf5 50%,#a78bfa 100%);
-    -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-  header p{font-size:13px;color:var(--text-secondary);margin-top:6px;letter-spacing:.03em}
-
-  /* Upload Zone */
-  .upload-zone{
-    background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);
-    border:2px dashed var(--glass-border);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;
-    transition:all .3s
-  }
-  .upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:rgba(255,255,255,0.08)}
-  .upload-zone .icon{font-size:36px;margin-bottom:10px}
-  .upload-zone .label{font-size:15px;font-weight:600;letter-spacing:.04em}
-  .upload-zone .hint{font-size:12px;color:var(--text-secondary);margin-top:5px;letter-spacing:.03em;line-height:1.5}
-  .upload-zone input{display:none}
-
-  /* Model loading bar */
-  .model-bar-wrap{
-    background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-    border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 16px;display:flex;align-items:center;gap:10px
-  }
-  .model-bar-wrap.done{display:none}
-  .model-bar-wrap .mlabel{font-size:12px;color:var(--text-secondary);letter-spacing:.03em;white-space:nowrap}
-  .model-bar-wrap .mbar{flex:1;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
-  .model-bar-wrap .mbar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s;width:0%}
-  .model-bar-wrap .mpct{font-size:11px;color:var(--accent);letter-spacing:.03em;white-space:nowrap;min-width:36px;text-align:right}
-
-  /* Size row */
-  .size-row{
-    background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
-    border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px 14px;
-    display:flex;align-items:center;gap:8px;flex-wrap:wrap
-  }
-  .size-label{font-size:12px;color:var(--text-secondary);letter-spacing:.03em;white-space:nowrap}
-  .size-row input{
-    width:72px;padding:6px 8px;border-radius:8px;border:1px solid var(--glass-border);
-    background:rgba(0,0,0,.3);color:var(--text);font-size:13px;font-family:inherit;text-align:center;
-    -webkit-appearance:none;appearance:none;outline:none
-  }
-  .size-row input:focus{border-color:var(--accent)}
-  .size-x{color:var(--text-secondary);font-size:13px}
-  .size-hint{font-size:10px;color:var(--text-secondary);letter-spacing:.02em;flex:1;min-width:140px}
-
-  /* Toolbar */
-  .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
-  .toolbar .status{font-size:12px;color:var(--text-secondary);letter-spacing:.03em;display:flex;align-items:center;gap:6px}
-  .status-dot{width:7px;height:7px;border-radius:50%;background:var(--success);flex-shrink:0}
-  .status-dot.busy{background:var(--warning);animation:pulse-dot 1.5s ease-in-out infinite}
-  @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
-
-  .btn{
-    padding:10px 18px;border-radius:var(--radius-sm);border:none;font-size:13px;font-weight:590;cursor:pointer;
-    letter-spacing:.04em;font-family:inherit;transition:all .2s;white-space:nowrap;-webkit-tap-highlight-color:transparent
-  }
-  .btn-glass{background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);color:var(--text);border:1px solid var(--glass-border)}
-  .btn-glass:hover{background:rgba(255,255,255,0.08);transform:translateY(-1px);box-shadow:0 8px 24px rgba(0,0,0,.2)}
-  .btn-glass:active{transform:scale(.97)}
-  .btn-glass:disabled{opacity:.35;pointer-events:none}
-  .btn-accent{background:var(--accent);color:#fff;box-shadow:0 4px 20px var(--accent-glow)}
-  .btn-accent:hover{transform:translateY(-1px);box-shadow:0 8px 30px var(--accent-glow)}
-  .btn-accent:active{transform:scale(.97)}
-  .btn-accent:disabled{opacity:.35;pointer-events:none;box-shadow:none}
-  .btn-danger{background:rgba(248,113,113,0.15);color:var(--error);border:1px solid rgba(248,113,113,0.2)}
-  .btn-danger:hover{background:rgba(248,113,113,0.25);transform:translateY(-1px)}
-  .btn-danger:active{transform:scale(.97)}
-  .btn-danger:disabled{opacity:.35;pointer-events:none}
-  .btn-sm{padding:6px 14px;font-size:12px;border-radius:10px}
-
-  /* Card Grid */
-  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
-  .grid:empty{display:none}
-  .grid:empty+.empty-state{display:flex}
-
-  .empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:50px 20px;color:var(--text-secondary);text-align:center}
-  .empty-state .icon{font-size:44px;margin-bottom:10px;opacity:.5}
-  .empty-state p{font-size:13px;line-height:1.6}
-
-  /* Card */
-  .card{
-    background:var(--glass);backdrop-filter:blur(30px) saturate(160%);-webkit-backdrop-filter:blur(30px) saturate(160%);
-    border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px;
-    transition:all .3s;display:flex;flex-direction:column;gap:10px
-  }
-  .card.done{border-color:rgba(52,211,153,.15)}
-  .card.error{border-color:rgba(248,113,113,.2)}
-
-  .card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
-  .card-name{font-size:12px;font-weight:500;color:var(--text);letter-spacing:.03em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-  .card-badge{font-size:10px;padding:2px 8px;border-radius:20px;letter-spacing:.04em;flex-shrink:0}
-  .badge-pending{background:rgba(148,148,168,.12);color:var(--text-secondary)}
-  .badge-downloading{background:rgba(251,191,36,.1);color:var(--warning)}
-  .badge-processing{background:rgba(91,156,245,.1);color:var(--accent)}
-  .badge-done{background:rgba(52,211,153,.1);color:var(--success)}
-  .badge-error{background:rgba(248,113,113,.1);color:var(--error)}
-
-  .card-compare{display:flex;gap:6px}
-  .card-img-wrap{flex:1;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;position:relative}
-  .card-img-wrap img{width:100%;height:100%;object-fit:contain;position:absolute;inset:0}
-  .card-img-wrap .placeholder{font-size:11px;color:var(--text-secondary);text-align:center;padding:6px}
-  .card-img-wrap.final{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='10' height='10' fill='%23ffffff10'/%3E%3Crect x='10' y='10' width='10' height='10' fill='%23ffffff10'/%3E%3C/svg%3E")}
-
-  .card-progress{height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
-  .card-progress-bar{height:100%;background:var(--accent);border-radius:2px;transition:width .3s;width:0%}
-  .card-progress-bar.done{background:var(--success)}
-  .card-progress-bar.error{background:var(--error)}
-
-  .card-status-text{font-size:10px;color:var(--text-secondary);letter-spacing:.03em}
-  .card-actions{display:flex;gap:6px;justify-content:flex-end}
-  .card-error-msg{font-size:10px;color:var(--error);letter-spacing:.03em;line-height:1.4}
-
-  /* ===== 编辑模式 ===== */
-  .editor-overlay{
-    position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.92);
-    display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .2s
-  }
-  .editor-overlay.active{opacity:1;pointer-events:auto}
-  .editor-topbar{
-    display:flex;align-items:center;justify-content:space-between;gap:8px;
-    padding:10px 14px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06);
-    flex-wrap:wrap
-  }
-  .editor-title{font-size:14px;font-weight:600;color:var(--text);letter-spacing:.04em;white-space:nowrap}
-  .editor-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
-  .ed-mode.active{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .ed-sep{color:rgba(255,255,255,.1);font-size:14px}
-  .ed-label{font-size:11px;color:var(--text-secondary);letter-spacing:.03em}
-  .brush-slider{width:80px;accent-color:var(--accent)}
-  .editor-canvas-wrap{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:crosshair;padding:10px}
-  .editor-canvas-wrap.panning{cursor:grab}
-  .editor-canvas-wrap.panning:active{cursor:grabbing}
-  #editorCanvas{max-width:100%;max-height:100%;box-shadow:0 0 40px rgba(0,0,0,.5)}
-  .btn-ai{font-size:14px!important;padding:10px 22px!important;font-weight:700!important;letter-spacing:.06em!important}
-  .ai-progress{font-size:12px;color:var(--warning);letter-spacing:.03em;animation:pulse-dot 1s ease-in-out infinite}
-  .sharpen-select{
-    padding:5px 8px;border-radius:8px;border:1px solid var(--glass-border);
-    background:rgba(0,0,0,.3);color:var(--text);font-size:12px;font-family:inherit;
-    outline:none;-webkit-appearance:none;appearance:none;cursor:pointer
-  }
-  .sharpen-select:focus{border-color:var(--accent)}
-  .editor-hint{text-align:center;padding:8px;font-size:11px;color:var(--text-secondary);letter-spacing:.03em;background:rgba(255,255,255,.02)}
-
-  @media(max-width:500px){
-    .editor-topbar{gap:4px;padding:8px 10px}
-    .editor-tools{gap:4px}
-    .editor-tools .btn-sm{padding:5px 10px;font-size:11px}
-    .brush-slider{width:50px}
-  }
-
-  /* ===== 响应式 ===== */
-  /* 手机 */
-  @media(max-width:500px){
-    body{padding:10px;padding-top:calc(10px + var(--safe-t));padding-bottom:calc(10px + var(--safe-b))}
-    .container{gap:14px}
-    .grid{grid-template-columns:1fr}
-    .upload-zone{padding:28px 14px}
-    .upload-zone .label{font-size:14px}
-    .toolbar{flex-direction:column;align-items:stretch}
-    .toolbar .actions{display:flex;gap:8px}
-    .toolbar .actions .btn{flex:1;text-align:center}
-    .card-compare{gap:4px}
-    .model-bar-wrap{flex-wrap:wrap;gap:6px}
-  }
-
-  /* 平板 */
-  @media(min-width:501px) and (max-width:900px){
-    .grid{grid-template-columns:repeat(auto-fill,minmax(300px,1fr))}
-    .container{gap:18px}
-  }
-
-  /* 桌面 */
-  @media(min-width:901px){
-    .grid{grid-template-columns:repeat(auto-fill,minmax(370px,1fr))}
-    .container{gap:22px}
-    .upload-zone{padding:48px 24px}
-  }
+@media(max-width:500px){
+  body{padding:10px;padding-top:calc(10px + var(--safe-t));padding-bottom:calc(10px + var(--safe-b))}
+  .container{gap:14px}
+  .grid{grid-template-columns:1fr}
+  .upload-zone{padding:28px 14px}
+  .toolbar{flex-direction:column;align-items:stretch}
+  .toolbar .actions{display:flex;gap:8px}
+  .toolbar .actions .btn{flex:1;text-align:center}
+}
+@media(min-width:901px){.grid{grid-template-columns:repeat(auto-fill,minmax(370px,1fr))}}
 </style>
 </head>
 <body>
@@ -232,95 +89,151 @@
 <div class="container">
   <header>
     <h1>批量抠图 · 液态玻璃工坊</h1>
-    <p>完全本地处理 · 不上传任何图片到服务器</p>
+    <p>国产模型 · 本地处理 · 隐私安全</p>
   </header>
 
   <div class="upload-zone" id="uploadZone">
     <div class="icon">🖼️</div>
-    <div class="label">拖拽图片/ZIP · 点击选择 · Ctrl+V 粘贴</div>
-    <div class="hint">支持 JPG / PNG / WebP · 多选 · 剪贴板粘贴 · ZIP 压缩包</div>
-    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp,.zip" multiple>
+    <div class="label">拖拽图片 · 点击选择 · Ctrl+V 粘贴</div>
+    <div class="hint">支持 JPG / PNG / WebP · 多选 · 图片不上传服务器</div>
+    <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" multiple>
   </div>
 
-  <!-- 模型预加载进度条 -->
-  <div class="model-bar-wrap" id="modelBar">
-    <span class="mlabel">🧠 AI 模型预加载</span>
-    <div class="mbar"><div class="mbar-fill" id="modelFill"></div></div>
-    <span class="mpct" id="modelPct">0%</span>
+  <div class="status-bar">
+    <span class="dot" id="statusDot"></span>
+    <span class="txt" id="statusText">正在从 npmmirror（阿里镜像）加载引擎…</span>
   </div>
 
-  <!-- 输出尺寸设置 -->
-  <div class="size-row" id="sizeRow">
-    <span class="size-label">输出尺寸</span>
+  <div class="size-row">
+    <span>输出尺寸</span>
     <input type="number" id="outW" placeholder="宽" min="0" step="1" inputmode="numeric">
-    <span class="size-x">×</span>
+    <span>×</span>
     <input type="number" id="outH" placeholder="高" min="0" step="1" inputmode="numeric">
-    <span class="size-hint">留空 = 原始尺寸；设置后不足自动补透明背景居中</span>
+    <span style="font-size:10px">留空=原始尺寸 · 不足补透明居中</span>
   </div>
 
   <div class="toolbar">
-    <div class="status">
-      <span class="status-dot" id="statusDot"></span>
-      <span id="statusText">就绪</span>
-    </div>
-    <div class="actions">
-      <button class="btn btn-accent" id="btnZip" disabled onclick="window._downloadAllZip()">📦 下载 ZIP</button>
-      <button class="btn btn-danger" id="btnClear" disabled onclick="window._clearAll()">🗑 清空</button>
+    <div></div>
+    <div class="actions" style="display:flex;gap:8px">
+      <button class="btn btn-accent" id="btnZip" disabled onclick="downloadZip()">📦 下载 ZIP</button>
+      <button class="btn btn-danger" id="btnClear" disabled onclick="clearAll()">🗑 清空</button>
     </div>
   </div>
 
   <div class="grid" id="grid"></div>
   <div class="empty-state" id="emptyState">
     <div class="icon">📂</div>
-    <p>拖拽图片或 ZIP 到上方区域<br>或按 Ctrl+V 粘贴剪贴板中的图片</p>
+    <p>拖拽图片到上方区域<br>或按 Ctrl+V 粘贴剪贴板中的图片</p>
   </div>
-</div>
-
-<!-- 编辑模式 Overlay -->
-<div class="editor-overlay" id="editorOverlay">
-  <div class="editor-topbar">
-    <span class="editor-title">✏️ 编辑抠图</span>
-    <div class="editor-tools">
-      <button class="btn btn-glass btn-sm ed-mode active" data-mode="restore" id="modeRestore">🖌️ 恢复</button>
-      <button class="btn btn-glass btn-sm ed-mode" data-mode="erase" id="modeErase">🧹 擦除</button>
-      <button class="btn btn-glass btn-sm ed-mode" data-mode="lasso" id="modeLasso">✏️ 套索AI</button>
-      <span class="ed-sep">|</span>
-      <span class="ed-label">笔刷</span>
-      <input type="range" id="brushSize" min="5" max="120" value="30" class="brush-slider">
-      <span id="brushSizeLabel">30px</span>
-      <span class="ed-sep">|</span>
-      <span class="ed-label">清晰度</span>
-      <select id="sharpenLevel" class="sharpen-select">
-        <option value="0">关闭</option>
-        <option value="0.5">轻度</option>
-        <option value="1" selected>标准</option>
-        <option value="1.5">增强</option>
-        <option value="2">最强</option>
-      </select>
-      <span class="ed-sep">|</span>
-      <button class="btn btn-accent btn-ai" id="btnAiRetry" style="display:none">🤖 AI 智能识别</button>
-      <span class="ai-progress" id="aiProgress" style="display:none">处理中…</span>
-      <button class="btn btn-glass btn-sm" onclick="window._editorUndo()">↩ 撤销</button>
-      <button class="btn btn-accent btn-sm" onclick="window._editorSave()">💾 保存</button>
-      <button class="btn btn-glass btn-sm" onclick="window._editorClose()">✕ 关闭</button>
-    </div>
-  </div>
-  <div class="editor-canvas-wrap">
-    <canvas id="editorCanvas"></canvas>
-  </div>
-  <div class="editor-hint" id="editorHint">🖌️ 恢复模式：涂抹处恢复为原图 ｜ 滚轮缩放 ｜ 拖拽平移</div>
 </div>
 
 <script>
-// ===== 全局 =====
+// ===== 轻量 JSZip（内联实现，零 CDN 依赖） =====
+// 仅实现 ZIP 打包所需的 store 模式
+const SimpleZip = {
+  _files: [],
+  file(name, blob) { this._files.push({ name, blob }); },
+  async generate() {
+    // 手动构造 ZIP 格式
+    const encoder = new TextEncoder();
+    const parts = [];
+    const localHeaders = [];
+    const centralHeaders = [];
+    let offset = 0;
+
+    for (const f of this._files) {
+      const nameBytes = encoder.encode(f.name);
+      const data = new Uint8Array(await f.blob.arrayBuffer());
+      const crc = crc32(data);
+
+      // Local file header
+      const local = new Uint8Array(30 + nameBytes.length);
+      local.set([0x50, 0x4b, 0x03, 0x04], 0); // signature
+      local.set([10, 0], 4); // version
+      local.set([0, 0], 6); // flags
+      local.set([0, 0], 8); // compression (store)
+      write16(local, 10, 0); write16(local, 12, 0); // time/date
+      write32(local, 14, crc);
+      write32(local, 18, data.length); // compressed size
+      write32(local, 22, data.length); // uncompressed size
+      write16(local, 26, nameBytes.length);
+      write16(local, 28, 0); // extra field length
+      local.set(nameBytes, 30);
+      parts.push(local); localHeaders.push({ offset, size: local.length + data.length });
+      parts.push(data);
+      offset += local.length + data.length;
+
+      // Central directory header
+      const central = new Uint8Array(46 + nameBytes.length);
+      central.set([0x50, 0x4b, 0x01, 0x02], 0);
+      central.set([10, 0], 4); // version made by
+      central.set([10, 0], 6); // version needed
+      central.set([0, 0], 8); // flags
+      central.set([0, 0], 10); // compression
+      write16(central, 12, 0); write16(central, 14, 0); // time/date
+      write32(central, 16, crc);
+      write32(central, 20, data.length);
+      write32(central, 24, data.length);
+      write16(central, 28, nameBytes.length);
+      write16(central, 30, 0); write16(central, 32, 0); // extra/comment
+      write16(central, 34, 0); // disk
+      write16(central, 36, 0); // internal attrs
+      write32(central, 38, 0); // external attrs
+      write32(central, 42, localHeaders[localHeaders.length-1].offset);
+      central.set(nameBytes, 46);
+      centralHeaders.push(central);
+    }
+
+    const cdOffset = offset;
+    const cdSize = centralHeaders.reduce((s, c) => s + c.length, 0);
+
+    // EOCD
+    const eocd = new Uint8Array(22);
+    eocd.set([0x50, 0x4b, 0x05, 0x06], 0);
+    write16(eocd, 4, 0); write16(eocd, 6, 0); // disk
+    write16(eocd, 8, this._files.length); write16(eocd, 10, this._files.length);
+    write32(eocd, 12, cdSize); write32(eocd, 16, cdOffset);
+    write16(eocd, 20, 0);
+
+    const all = new Uint8Array(offset + cdSize + 22);
+    let pos = 0;
+    for (const p of parts) { all.set(new Uint8Array(p.buffer || p), pos); pos += p.length; }
+    for (const c of centralHeaders) { all.set(c, pos); pos += c.length; }
+    all.set(eocd, pos);
+
+    this._files = [];
+    return new Blob([all], { type: 'application/zip' });
+  }
+};
+
+function write16(arr, off, v) { arr[off] = v & 0xFF; arr[off+1] = (v >> 8) & 0xFF; }
+function write32(arr, off, v) { arr[off] = v & 0xFF; arr[off+1] = (v >> 8) & 0xFF; arr[off+2] = (v >> 16) & 0xFF; arr[off+3] = (v >> 24) & 0xFF; }
+
+const crcTable = new Uint32Array(256);
+for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); crcTable[n] = c; }
+function crc32(data) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) c = crcTable[(c ^ data[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+function downloadBlob(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+// ===== 全局状态 =====
+const $ = id => document.getElementById(id);
 const jobs = new Map();
 let jobCounter = 0;
 let activeCount = 0;
-let removeBackgroundFn = null;
-let engineReady = false;
+let removeBgFn = null;
 
-// ===== DOM =====
-const $ = id => document.getElementById(id);
+// ===== 初始化 DOM 事件 =====
 const uploadZone = $('uploadZone');
 const fileInput = $('fileInput');
 const grid = $('grid');
@@ -329,167 +242,58 @@ const statusDot = $('statusDot');
 const statusText = $('statusText');
 const btnZip = $('btnZip');
 const btnClear = $('btnClear');
-const modelBar = $('modelBar');
-const modelFill = $('modelFill');
-const modelPct = $('modelPct');
 
-// ===== 多 CDN 轮流尝试（含国内镜像） =====
-const CDN_LIST = [
-  ['npmmirror', 'https://registry.npmmirror.com/@imgly/background-removal/1.6.0/files/dist/index.mjs'],
-  ['esm.sh',    'https://esm.sh/@imgly/background-removal@1.6.0'],
-  ['jsdelivr',  'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.6.0/dist/index.mjs'],
-];
-
-async function loadEngine() {
-  for (const [name, url] of CDN_LIST) {
-    statusText.textContent = `连接 ${name}…`;
-    try {
-      const mod = await Promise.race([
-        import(url),
-        new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 12000))
-      ]);
-      removeBackgroundFn = mod.removeBackground;
-      // 如果从 npmmirror 加载 JS，尝试让模型也从国内下载
-      if (name === 'npmmirror' && mod.setModelUrl) {
-        try { mod.setModelUrl('https://registry.npmmirror.com/@imgly/background-removal-data/1.6.0/files/'); } catch(e) {}
-      }
-      console.log(`✅ 引擎 via ${name}`);
-      return;
-    } catch (e) {
-      console.warn(`❌ ${name}:`, e.message);
-    }
-  }
-  throw new Error('所有 CDN 均无法连接');
-}
-
-// ===== 预加载模型（用极小 PNG 触发下载） =====
-const TINY_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==';
-
-async function preloadModel() {
-  if (!removeBackgroundFn) return;
-  modelBar.style.display = 'flex';
-
-  try {
-    // 将 base64 转成 Blob
-    const resp = await fetch(TINY_PNG);
-    const blob = await resp.blob();
-
-    await removeBackgroundFn(blob, {
-      output: { format: 'image/png' },
-      progress: (key, current, total) => {
-        if ((key === 'fetch:model' || key.startsWith('download')) && total > 0) {
-          const pct = Math.min(99, Math.round((current / total) * 100));
-          modelFill.style.width = pct + '%';
-          modelPct.textContent = pct + '%';
-          statusText.textContent = `下载 AI 模型 ${pct}%`;
-        }
-      },
-    });
-
-    modelFill.style.width = '100%';
-    modelPct.textContent = '✓';
-    statusText.textContent = '模型就绪 · 等待上传';
-    statusDot.className = 'status-dot';
-  } catch (e) {
-    console.warn('预加载失败，将在首次抠图时下载:', e.message);
-    statusText.textContent = '就绪 · 模型将在使用时下载';
-    statusDot.className = 'status-dot';
-  }
-
-  // 延迟隐藏进度条
-  setTimeout(() => { modelBar.classList.add('done'); }, 1500);
-  engineReady = true;
-}
-
-// ===== 启动流程（非阻塞） =====
-let pendingQueue = []; // 引擎就绪前的待处理队列
-
-(async function boot() {
-  statusDot.className = 'status-dot busy';
-  statusText.textContent = '加载抠图引擎…';
-  try {
-    await loadEngine();
-    statusText.textContent = '引擎就绪 · 预加载模型中…';
-    await preloadModel();
-    // 处理排队中的图片
-    if (pendingQueue.length) {
-      statusText.textContent = `处理 ${pendingQueue.length} 张排队图片…`;
-      for (const id of pendingQueue) processImage(id);
-      pendingQueue = [];
-    }
-  } catch (e) {
-    statusText.textContent = '⚠️ 引擎加载失败，可尝试刷新或使用备用方案';
-    statusDot.className = 'status-dot';
-    statusDot.style.background = 'var(--error)';
-    // 把所有排队图片标记为错误
-    for (const id of pendingQueue) {
-      const job = jobs.get(id);
-      if (job) {
-        job.status = 'error';
-        job.error = '抠图引擎未加载';
-        badge(id, 'badge-error', '失败');
-        $(`statusText-${id}`).textContent = '引擎未就绪';
-      }
-    }
-    pendingQueue = [];
-  }
-})();
-
-// ===== 上传 =====
 uploadZone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', () => handleFiles(fileInput.files));
-
 uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
 uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
-uploadZone.addEventListener('drop', e => {
-  e.preventDefault();
-  uploadZone.classList.remove('drag-over');
-  handleFiles(e.dataTransfer.files);
-});
-
+uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
 document.addEventListener('paste', e => {
   const items = e.clipboardData?.items;
   if (!items) return;
   const files = [];
-  for (const item of items) {
-    if (item.type.startsWith('image/')) {
-      const f = item.getAsFile();
-      if (f) files.push(f);
-    }
-  }
+  for (const item of items) { if (item.type.startsWith('image/')) { const f = item.getAsFile(); if (f) files.push(f); } }
   if (files.length) { e.preventDefault(); handleFiles(files); }
 });
 
-async function handleFiles(fileList) {
-  if (!engineReady) engineReady = true;
-
-  const imageFiles = [];
-  for (const f of Array.from(fileList)) {
-    if (f.name.toLowerCase().endsWith('.zip') || f.type === 'application/zip' || f.type === 'application/x-zip-compressed') {
-      try {
-        const zip = await JSZip.loadAsync(f);
-        for (const [path, entry] of Object.entries(zip.files)) {
-          if (entry.dir) continue;
-          const ext = path.split('.').pop().toLowerCase();
-          if (!['jpg','jpeg','png','webp'].includes(ext)) continue;
-          const blob = await entry.async('blob');
-          const fname = path.split('/').pop() || path;
-          const mime = ext === 'jpg' ? 'image/jpeg' : ext === 'webp' ? 'image/webp' : `image/${ext}`;
-          imageFiles.push(new File([blob], fname, { type: mime }));
-        }
-      } catch (e) { alert(`ZIP 解压失败：${e.message}`); }
-      continue;
-    }
-    if (f.type.startsWith('image/')) imageFiles.push(f);
+// ===== 加载引擎（仅 npmmirror，12 秒超时） =====
+(async function boot() {
+  const url = 'https://registry.npmmirror.com/@imgly/background-removal/1.6.0/files/dist/index.mjs';
+  statusText.textContent = '正在从 npmmirror（阿里镜像）加载引擎…';
+  try {
+    const mod = await Promise.race([
+      import(url),
+      new Promise((_, r) => setTimeout(() => r(new Error('timeout')), 12000))
+    ]);
+    removeBgFn = mod.removeBackground;
+    statusDot.className = 'dot';
+    statusText.textContent = '引擎就绪 · 模型将在首次抠图时自动下载';
+    // 处理排队
+    flushQueue();
+  } catch (e) {
+    statusDot.className = 'dot err';
+    statusText.textContent = '引擎加载失败，请检查网络或刷新重试（使用阿里 npm 镜像）';
   }
+})();
 
-  if (!imageFiles.length) return;
-  for (const file of imageFiles) {
+// ===== 排队机制 =====
+let pendingQueue = [];
+function flushQueue() {
+  if (!removeBgFn) return;
+  for (const id of pendingQueue) processImage(id);
+  pendingQueue = [];
+}
+
+// ===== 文件处理 =====
+function handleFiles(fileList) {
+  const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
+  if (!files.length) return;
+  for (const file of files) {
     const id = ++jobCounter;
     const blobUrl = URL.createObjectURL(file);
-    jobs.set(id, { file, blobUrl, status:'pending', error:null, resultBlob:null, resultUrl:null, sharpenLevel:1 });
+    jobs.set(id, { file, blobUrl, resultBlob: null, resultUrl: null, status: 'pending', error: null });
     createCard(id, file.name, blobUrl);
-    processImage(id);
+    if (removeBgFn) processImage(id); else { pendingQueue.push(id); $(`statusText-${id}`).textContent = '等待引擎…'; $(`badge-${id}`).className = 'card-badge badge-downloading'; $(`badge-${id}`).textContent = '排队'; }
   }
   updateToolbar();
   emptyState.style.display = 'none';
@@ -498,58 +302,33 @@ async function handleFiles(fileList) {
 
 // ===== 卡片 =====
 function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+function badge(id, cls, text) { const b = $(`badge-${id}`); if (b) { b.className = 'card-badge ' + cls; b.textContent = text; } }
 
 function createCard(id, name, blobUrl) {
   const card = document.createElement('div');
-  card.className = 'card';
-  card.id = `card-${id}`;
+  card.className = 'card'; card.id = `card-${id}`;
   card.innerHTML = `
-    <div class="card-top">
-      <span class="card-name" title="${esc(name)}">${esc(name)}</span>
-      <span class="card-badge badge-pending" id="badge-${id}">排队</span>
-    </div>
-    <div class="card-compare">
-      <div class="card-img-wrap"><img src="${blobUrl}"></div>
-      <div class="card-img-wrap final" id="result-${id}"><span class="placeholder">等待</span></div>
-    </div>
+    <div class="card-top"><span class="card-name" title="${esc(name)}">${esc(name)}</span><span class="card-badge badge-pending" id="badge-${id}">排队</span></div>
+    <div class="card-compare"><div class="card-img-wrap"><img src="${blobUrl}"></div><div class="card-img-wrap final" id="result-${id}"><span class="placeholder">等待</span></div></div>
     <div class="card-progress"><div class="card-progress-bar" id="progress-${id}"></div></div>
     <div class="card-status-text" id="statusText-${id}">排队中…</div>
     <div class="card-actions" id="actions-${id}"></div>
-    <div class="card-error-msg" id="error-${id}" style="display:none"></div>
-  `;
+    <div class="card-error-msg" id="error-${id}" style="display:none"></div>`;
   grid.appendChild(card);
-}
-
-function badge(id, cls, text) {
-  const b = $(`badge-${id}`);
-  if (b) { b.className = 'card-badge ' + cls; b.textContent = text; }
 }
 
 // ===== 抠图 =====
 async function processImage(id) {
   const job = jobs.get(id);
-  if (!job) return;
-
-  // 引擎未就绪 → 排队
-  if (!removeBackgroundFn) {
-    pendingQueue.push(id);
-    $(`statusText-${id}`).textContent = '等待引擎就绪…';
-    badge(id, 'badge-downloading', '排队');
-    return;
-  }
-
-  job.status = 'processing';
-  activeCount++;
-  updateStatus();
-  updateToolbar();
-
+  if (!job || !removeBgFn) return;
+  job.status = 'processing'; activeCount++;
+  updateStatus(); updateToolbar();
   const progressBar = $(`progress-${id}`);
   const statusEl = $(`statusText-${id}`);
 
   try {
     statusEl.textContent = '下载模型中…';
     badge(id, 'badge-downloading', '下载');
-
     const config = {
       output: { format: 'image/png' },
       progress: (key, current, total) => {
@@ -561,144 +340,43 @@ async function processImage(id) {
         }
       },
     };
-
-    let resultBlob = await removeBackgroundFn(job.blobUrl, config);
+    let resultBlob = await removeBgFn(job.blobUrl, config);
     badge(id, 'badge-processing', '处理');
     progressBar.style.width = '70%';
-    statusEl.textContent = '生成中…';
+    statusEl.textContent = '处理中…';
 
-    // 自定义输出尺寸
+    // 尺寸调整
     const tw = parseInt($('outW').value) || 0;
     const th = parseInt($('outH').value) || 0;
-    if (tw > 0 || th > 0) {
-      statusEl.textContent = `调整尺寸至 ${tw||'auto'}×${th||'auto'}…`;
-      progressBar.style.width = '80%';
-      resultBlob = await resizeCanvas(resultBlob, tw, th);
-    }
+    if (tw > 0 || th > 0) { resultBlob = await fitCanvas(resultBlob, tw, th); }
 
-    // 默认清晰化
-    statusEl.textContent = '清晰化处理…';
-    progressBar.style.width = '90%';
-    resultBlob = await sharpenBlob(resultBlob, job.sharpenLevel ?? 1);
-    job.sharpenLevel = job.sharpenLevel ?? 1;
+    // 清晰化
+    resultBlob = await sharpenBlob(resultBlob, 1);
+    progressBar.style.width = '95%';
 
     const resultUrl = URL.createObjectURL(resultBlob);
-    job.resultBlob = resultBlob;
-    job.resultUrl = resultUrl;
-    job.status = 'done';
-
+    job.resultBlob = resultBlob; job.resultUrl = resultUrl; job.status = 'done';
     $(`result-${id}`).innerHTML = `<img src="${resultUrl}" alt="结果">`;
     badge(id, 'badge-done', '✓');
-    progressBar.classList.add('done');
-    progressBar.style.width = '100%';
+    progressBar.classList.add('done'); progressBar.style.width = '100%';
     statusEl.textContent = '完成';
-    $(`actions-${id}`).innerHTML =
-      `<button class="btn btn-glass btn-sm" onclick="window._editOpen(${id})">✏️ 编辑</button>
-       <button class="btn btn-glass btn-sm" onclick="window._download(${id})">💾 下载</button>`;
-
+    $(`actions-${id}`).innerHTML = `<button class="btn btn-glass btn-sm" onclick="downloadOne(${id})">💾 下载</button>`;
   } catch (e) {
-    job.status = 'error';
-    job.error = e.message || '未知';
+    job.status = 'error'; job.error = e.message || '未知';
     badge(id, 'badge-error', '失败');
-    progressBar.classList.add('error');
-    progressBar.style.width = '100%';
+    progressBar.classList.add('error'); progressBar.style.width = '100%';
     statusEl.textContent = '失败';
     $(`result-${id}`).innerHTML = '<span class="placeholder">❌</span>';
     $(`error-${id}`).textContent = job.error;
     $(`error-${id}`).style.display = 'block';
   }
-
-  activeCount--;
-  updateStatus();
-  updateToolbar();
-}
-
-// 将图片居中放置到目标尺寸的透明画布上
-async function resizeCanvas(blob, tw, th) {
-  const img = await new Promise((resolve, reject) => {
-    const i = new Image();
-    i.onload = () => resolve(i);
-    i.onerror = reject;
-    i.src = URL.createObjectURL(blob);
-  });
-
-  const w = img.naturalWidth;
-  const h = img.naturalHeight;
-  const ow = tw > 0 ? tw : w;
-  const oh = th > 0 ? th : h;
-
-  // 如果原图已大于等于目标尺寸且不强制拉伸，直接返回原 blob
-  if (w >= ow && h >= oh && tw > 0 && th > 0) {
-    // 仍然需要裁剪/缩放：保持比例适配目标区域
-  }
-
-  const canvas = document.createElement('canvas');
-  canvas.width = ow;
-  canvas.height = oh;
-  const ctx = canvas.getContext('2d');
-
-  // 计算居中放置的缩放和位置（contain 模式）
-  const scale = Math.min(ow / w, oh / h, 1); // 不放大，只缩小
-  const sw = w * scale;
-  const sh = h * scale;
-  const sx = (ow - sw) / 2;
-  const sy = (oh - sh) / 2;
-
-  ctx.drawImage(img, sx, sy, sw, sh);
-
-  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-}
-
-// 清晰化处理（卷积锐化）
-async function sharpenBlob(blob, strength) {
-  if (strength <= 0) return blob;
-  const img = await new Promise((resolve, reject) => {
-    const i = new Image(); i.onload = () => resolve(i); i.onerror = reject;
-    i.src = URL.createObjectURL(blob);
-  });
-  const cvs = document.createElement('canvas');
-  cvs.width = img.naturalWidth; cvs.height = img.naturalHeight;
-  const ctx = cvs.getContext('2d');
-  ctx.drawImage(img, 0, 0);
-  const w = cvs.width, h = cvs.height;
-  const src = ctx.getImageData(0, 0, w, h);
-  const dst = ctx.createImageData(w, h);
-  const s = strength; // 0.5~2
-  const k = [0,-s/4,0, -s/4,1+s,-s/4, 0,-s/4,0]; // 3x3 sharpen kernel
-  const kw = 3, kh = 3, kcx = 1, kcy = 1;
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let r=0,g=0,b=0,a=0;
-      for (let ky=0;ky<kh;ky++) {
-        for (let kx=0;kx<kw;kx++) {
-          const sx2 = Math.min(w-1,Math.max(0,x+kx-kcx));
-          const sy2 = Math.min(h-1,Math.max(0,y+ky-kcy));
-          const idx = (sy2*w+sx2)*4;
-          const kv = k[ky*kw+kx];
-          r+=src.data[idx]*kv; g+=src.data[idx+1]*kv;
-          b+=src.data[idx+2]*kv; a+=src.data[idx+3]*kv;
-        }
-      }
-      const di=(y*w+x)*4;
-      dst.data[di]=Math.min(255,Math.max(0,r));
-      dst.data[di+1]=Math.min(255,Math.max(0,g));
-      dst.data[di+2]=Math.min(255,Math.max(0,b));
-      dst.data[di+3]=Math.min(255,Math.max(0,a));
-    }
-  }
-  ctx.putImageData(dst,0,0);
-  return new Promise(r=>cvs.toBlob(r,'image/png'));
+  activeCount--; updateStatus(); updateToolbar();
 }
 
 function updateStatus() {
-  if (!removeBackgroundFn) return;
-  if (activeCount > 0) {
-    statusDot.className = 'status-dot busy';
-    statusText.textContent = `处理中 · ${activeCount} 张`;
-  } else {
-    statusDot.className = 'status-dot';
-    statusText.textContent = '就绪 · 等待上传';
-  }
+  if (!removeBgFn) return;
+  statusDot.className = activeCount > 0 ? 'dot' : 'dot';
+  statusText.textContent = activeCount > 0 ? `处理中 · ${activeCount} 张` : '就绪 · 等待上传';
 }
 
 function updateToolbar() {
@@ -710,453 +388,70 @@ function updateToolbar() {
   if (!all.length) emptyState.style.display = 'flex';
 }
 
-window._download = function(id) {
+// ===== 下载 =====
+function downloadOne(id) {
   const job = jobs.get(id);
   if (!job?.resultBlob) return;
-  if (typeof saveAs === 'undefined') { alert('组件加载中，请稍候'); return; }
-  saveAs(job.resultBlob, job.file.name.replace(/\.[^.]+$/, '') + '（扣图版）.png');
-};
+  downloadBlob(job.resultBlob, job.file.name.replace(/\.[^.]+$/, '') + '（扣图版）.png');
+}
 
-window._downloadAllZip = async function() {
+async function downloadZip() {
   const done = Array.from(jobs.values()).filter(j => j.status === 'done' && j.resultBlob);
   if (!done.length) return;
-  if (typeof JSZip === 'undefined') { alert('ZIP组件加载中，请稍候'); return; }
-  const zip = new JSZip();
+  const zip = new SimpleZip();
   const seen = new Map();
   for (const job of done) {
     let name = job.file.name.replace(/\.[^.]+$/, '') + '（扣图版）.png';
-    if (seen.has(name)) {
-      const base = name.replace('（扣图版）.png', '');
-      let n = 1;
-      while (seen.has(`${base}（${n}）（扣图版）.png`)) n++;
-      name = `${base}（${n}）（扣图版）.png`;
-    }
+    if (seen.has(name)) { let n = 1; while (seen.has(name.replace('（扣图版）', `（${n}）（扣图版）`))) n++; name = name.replace('（扣图版）', `（${n}）（扣图版）`); }
     seen.set(name, true);
     zip.file(name, job.resultBlob);
   }
-  saveAs(await zip.generateAsync({ type: 'blob' }), '抠图结果.zip');
-};
-
-window._clearAll = function() {
-  for (const [, job] of jobs) {
-    if (job.blobUrl) URL.revokeObjectURL(job.blobUrl);
-    if (job.resultUrl) URL.revokeObjectURL(job.resultUrl);
-  }
-  jobs.clear();
-  grid.innerHTML = '';
-  emptyState.style.display = 'flex';
-  updateToolbar();
-};
-
-// ===== 编辑模式 =====
-const editorOverlay = $('editorOverlay');
-const editorCanvas = $('editorCanvas');
-const editorHint = $('editorHint');
-const ctx = editorCanvas.getContext('2d');
-
-let editJobId = null;
-let editOrigImg = null;    // 原始图 Image
-let editResultImg = null;  // 抠图结果 Image
-let editMaskCvs = null;    // 遮罩 canvas（0=透明/结果, 255=原图）
-let editMaskCtx = null;
-let editMode = 'restore';  // restore | erase | lasso
-let editBrushSize = 30;
-let editPainting = false;
-let editLassoPts = [];     // 套索路径点
-let editLassoActive = false;
-let editUndoStack = [];
-let editZoom = 1;
-let editPanX = 0, editPanY = 0;
-let editPanning = false;
-let editPanStart = null;
-
-// 初始化编辑器 UI 事件
-$('brushSize').addEventListener('input', e => {
-  editBrushSize = +e.target.value;
-  $('brushSizeLabel').textContent = editBrushSize + 'px';
-});
-document.querySelectorAll('.ed-mode').forEach(b => {
-  b.addEventListener('click', () => {
-    document.querySelectorAll('.ed-mode').forEach(x => x.classList.remove('active'));
-    b.classList.add('active');
-    editMode = b.dataset.mode;
-    editLassoPts = []; editLassoActive = false;
-    $('btnAiRetry').style.display = editMode === 'lasso' ? '' : 'none';
-    editorHint.textContent = editMode === 'restore' ? '🖌️ 恢复模式：涂抹处恢复为原图' :
-                             editMode === 'erase' ? '🧹 擦除模式：涂抹处变透明' :
-                             '✏️ 套索模式：按住拖拽画出选区，松手自动闭合，AI 智能识别边缘';
-    editorCanvas.style.cursor = 'crosshair';
-    renderEditor();
-  });
-});
-$('btnAiRetry').addEventListener('click', () => aiRetryLasso());
-$('sharpenLevel').addEventListener('change', async function() {
-  if (!editJobId) return;
-  const job = jobs.get(editJobId);
-  const level = parseFloat(this.value);
-  job.sharpenLevel = level;
-  editorHint.textContent = '⏳ 重新清晰化处理…';
-  const newBlob = await sharpenBlob(job.resultBlob, level);
-  if (job.resultUrl) URL.revokeObjectURL(job.resultUrl);
-  job.resultBlob = newBlob;
-  job.resultUrl = URL.createObjectURL(newBlob);
-  editResultImg = await new Promise((resolve, reject) => {
-    const i = new Image(); i.onload = () => resolve(i); i.onerror = reject;
-    i.src = job.resultUrl;
-  });
-  renderEditor();
-  editorHint.textContent = '✅ 清晰度已更新';
-});
-
-// 画布事件
-editorCanvas.addEventListener('mousedown', e => { editorMouseDown(e); e.preventDefault(); });
-editorCanvas.addEventListener('mousemove', e => { editorMouseMove(e); e.preventDefault(); });
-window.addEventListener('mouseup', () => { editorMouseUp(); });
-editorCanvas.addEventListener('wheel', e => {
-  e.preventDefault();
-  const delta = e.deltaY > 0 ? 0.9 : 1.1;
-  editZoom = Math.max(0.2, Math.min(5, editZoom * delta));
-  renderEditor();
-});
-editorCanvas.addEventListener('contextmenu', e => e.preventDefault());
-
-window._editOpen = async function(id) {
-  const job = jobs.get(id);
-  if (!job || !job.resultBlob) return;
-  editJobId = id;
-  editUndoStack = [];
-  editZoom = 1; editPanX = 0; editPanY = 0;
-  editLassoPts = []; editLassoActive = false;
-  // 同步清晰度设置
-  $('sharpenLevel').value = job.sharpenLevel ?? 1;
-
-  // 加载原图和结果
-  const loadImg = src => new Promise((resolve, reject) => {
-    const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = src;
-  });
-  editOrigImg = await loadImg(job.blobUrl);
-  editResultImg = await loadImg(job.resultUrl);
-
-  // 创建遮罩
-  const w = editResultImg.naturalWidth, h = editResultImg.naturalHeight;
-  editMaskCvs = document.createElement('canvas');
-  editMaskCvs.width = w; editMaskCvs.height = h;
-  editMaskCtx = editMaskCvs.getContext('2d');
-  editMaskCtx.fillStyle = '#000'; editMaskCtx.fillRect(0, 0, w, h);
-
-  editorCanvas.width = w; editorCanvas.height = h;
-  editorOverlay.classList.add('active');
-  renderEditor();
-};
-
-window._editorClose = function() {
-  editorOverlay.classList.remove('active');
-  editJobId = null;
-};
-
-window._editorSave = async function() {
-  if (!editJobId) return;
-  const job = jobs.get(editJobId);
-  // 合成最终图
-  const w = editorCanvas.width, h = editorCanvas.height;
-  const out = document.createElement('canvas'); out.width = w; out.height = h;
-  const octx = out.getContext('2d');
-  octx.drawImage(editResultImg, 0, 0);
-  const idata = octx.getImageData(0, 0, w, h);
-  const mdata = editMaskCtx.getImageData(0, 0, w, h);
-  const origCvs = document.createElement('canvas'); origCvs.width = w; origCvs.height = h;
-  const origCtx = origCvs.getContext('2d'); origCtx.drawImage(editOrigImg, 0, 0, w, h);
-  const odata = origCtx.getImageData(0, 0, w, h);
-  for (let i = 0; i < mdata.data.length; i += 4) {
-    if (mdata.data[i] > 128) {
-      idata.data[i] = odata.data[i];
-      idata.data[i+1] = odata.data[i+1];
-      idata.data[i+2] = odata.data[i+2];
-      idata.data[i+3] = odata.data[i+3];
-    }
-  }
-  octx.putImageData(idata, 0, 0);
-  let newBlob = await new Promise(r => out.toBlob(r, 'image/png'));
-  // 应用当前清晰度设置
-  const level = parseFloat($('sharpenLevel').value);
-  newBlob = await sharpenBlob(newBlob, level);
-  job.sharpenLevel = level;
-  if (job.resultUrl) URL.revokeObjectURL(job.resultUrl);
-  job.resultBlob = newBlob;
-  job.resultUrl = URL.createObjectURL(newBlob);
-  $(`result-${editJobId}`).innerHTML = `<img src="${job.resultUrl}" alt="结果">`;
-  window._editorClose();
-};
-
-window._editorUndo = function() {
-  if (editUndoStack.length) {
-    const data = editUndoStack.pop();
-    editMaskCtx.putImageData(data, 0, 0);
-    renderEditor();
-  }
-};
-
-function renderEditor() {
-  const w = editorCanvas.width, h = editorCanvas.height;
-  ctx.clearRect(0, 0, w, h);
-  ctx.save();
-  ctx.translate(editPanX, editPanY);
-  ctx.scale(editZoom, editZoom);
-
-  // 底层：原图
-  ctx.drawImage(editOrigImg, 0, 0);
-
-  // 中层：淡蓝色覆盖被抠掉的区域
-  // 创建一个临时 canvas 来获取结果图的 alpha
-  const tmpCvs = document.createElement('canvas'); tmpCvs.width = w; tmpCvs.height = h;
-  const tmpCtx = tmpCvs.getContext('2d');
-  tmpCtx.drawImage(editResultImg, 0, 0);
-
-  const origData = ctx.getImageData(0, 0, w, h);
-  const alphaData = tmpCtx.getImageData(0, 0, w, h);
-
-  // 遮罩数据
-  let maskData = null;
-  if (editMaskCvs) maskData = editMaskCtx.getImageData(0, 0, w, h);
-
-  for (let i = 0; i < origData.data.length; i += 4) {
-    const hasResult = alphaData.data[i + 3] > 64; // 结果图不透明=保留区域
-    let restored = false;
-    if (maskData && maskData.data[i] > 128) restored = true; // 笔刷恢复
-
-    if (restored || hasResult) {
-      // 保留区域：保持原图色彩（已画在底层）
-      // 不做任何事，原图已经在底层
-    } else {
-      // 移除区域：淡蓝色蒙版
-      origData.data[i] = Math.min(255, origData.data[i] * 0.3 + 91);
-      origData.data[i+1] = Math.min(255, origData.data[i+1] * 0.3 + 156);
-      origData.data[i+2] = Math.min(255, origData.data[i+2] * 0.3 + 245);
-      origData.data[i+3] = 255;
-    }
-  }
-  ctx.putImageData(origData, 0, 0);
-
-  // 上层：半透明绘制结果图（保留区域有原色）
-  ctx.globalAlpha = 0.15;
-  ctx.drawImage(editResultImg, 0, 0);
-  ctx.globalAlpha = 1;
-
-  // 套索路径
-    ctx.strokeStyle = '#5b9cf5'; ctx.lineWidth = 2 / editZoom;
-    ctx.setLineDash([6 / editZoom, 4 / editZoom]);
-    ctx.beginPath();
-    ctx.moveTo(editLassoPts[0].x, editLassoPts[0].y);
-    for (let i = 1; i < editLassoPts.length; i++) {
-      ctx.lineTo(editLassoPts[i].x, editLassoPts[i].y);
-    }
-    if (editLassoActive) {
-      // 画线到鼠标位置
-      ctx.lineTo(editLassoPts[editLassoPts.length-1].x, editLassoPts[editLassoPts.length-1].y);
-    }
-    ctx.stroke();
-    ctx.setLineDash([]);
-    // 起点小圆
-    ctx.fillStyle = '#5b9cf5';
-    ctx.beginPath(); ctx.arc(editLassoPts[0].x, editLassoPts[0].y, 4 / editZoom, 0, Math.PI*2); ctx.fill();
-  }
-  ctx.restore();
+  downloadBlob(await zip.generate(), '抠图结果.zip');
 }
 
-function canvasToImage(pos) {
-  const rect = editorCanvas.getBoundingClientRect();
-  return {
-    x: (pos.clientX - rect.left - editPanX) / editZoom,
-    y: (pos.clientY - rect.top - editPanY) / editZoom
-  };
+function clearAll() {
+  for (const [, job] of jobs) { if (job.blobUrl) URL.revokeObjectURL(job.blobUrl); if (job.resultUrl) URL.revokeObjectURL(job.resultUrl); }
+  jobs.clear(); grid.innerHTML = ''; emptyState.style.display = 'flex'; updateToolbar();
 }
 
-function editorMouseDown(e) {
-  if (e.button === 2) { editPanning = true; editPanStart = { x: e.clientX - editPanX, y: e.clientY - editPanY }; return; }
-  if (e.button !== 0) return;
-  if (editMode === 'lasso') {
-    editLassoActive = true;
-    editLassoPts = [canvasToImage(e)];
-    return;
-  }
-  editPainting = true;
-  if (editMaskCvs) editUndoStack.push(editMaskCtx.getImageData(0, 0, editMaskCvs.width, editMaskCvs.height));
-  paintBrush(canvasToImage(e));
+// ===== Canvas 工具 =====
+async function fitCanvas(blob, tw, th) {
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(blob); });
+  const w = img.naturalWidth, h = img.naturalHeight;
+  const ow = tw > 0 ? tw : w, oh = th > 0 ? th : h;
+  const cvs = document.createElement('canvas'); cvs.width = ow; cvs.height = oh;
+  const ctx = cvs.getContext('2d');
+  const scale = Math.min(ow / w, oh / h, 1);
+  ctx.drawImage(img, (ow - w * scale) / 2, (oh - h * scale) / 2, w * scale, h * scale);
+  return new Promise(r => cvs.toBlob(r, 'image/png'));
 }
 
-function editorMouseMove(e) {
-  if (editPanning) { editPanX = e.clientX - editPanStart.x; editPanY = e.clientY - editPanStart.y; renderEditor(); return; }
-  if (editMode === 'lasso' && editLassoActive) {
-    const pt = canvasToImage(e);
-    const last = editLassoPts[editLassoPts.length - 1];
-    // 间隔采样减少点数
-    if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) > 5) {
-      editLassoPts.push(pt);
-    }
-    renderEditor();
-    return;
-  }
-  if (editPainting) paintBrush(canvasToImage(e));
-}
-
-function editorMouseUp() {
-  if (editMode === 'lasso' && editLassoActive && editLassoPts.length > 2) {
-    editLassoActive = false;
-    // 自动闭合：连接到起点
-    if (editLassoPts.length > 2) {
-      editLassoPts.push({ ...editLassoPts[0] });
-      renderEditor();
-      // 自动触发 AI
-      aiRetryLasso();
-    }
-  }
-  editPainting = false;
-  editPanning = false;
-}
-
-function paintBrush(pos) {
-  if (!editMaskCtx) return;
-  const r = editBrushSize / 2;
-  editMaskCtx.beginPath();
-  editMaskCtx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
-  editMaskCtx.fillStyle = editMode === 'restore' ? '#fff' : '#000';
-  editMaskCtx.fill();
-  renderEditor();
-}
-
-function isInsideLasso(x, y, pts) {
-  // 射线法判断点是否在多边形内
-  let inside = false;
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const xi = pts[i].x, yi = pts[i].y;
-    const xj = pts[j].x, yj = pts[j].y;
-    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
-
-async function aiRetryLasso() {
-  if (editLassoPts.length < 3 || !editOrigImg || !editJobId) return;
-
-  const w = editOrigImg.naturalWidth, h = editOrigImg.naturalHeight;
-
-  // 计算套索包围盒（加 20px padding）
-  let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-  for (const p of editLassoPts) {
-    minX = Math.min(minX, p.x); minY = Math.min(minY, p.y);
-    maxX = Math.max(maxX, p.x); maxY = Math.max(maxY, p.y);
-  }
-  const pad = 20;
-  const sx = Math.max(0, Math.floor(minX) - pad);
-  const sy = Math.max(0, Math.floor(minY) - pad);
-  const sw = Math.min(w - sx, Math.ceil(maxX - minX) + pad * 2);
-  const sH = Math.min(h - sy, Math.ceil(maxY - minY) + pad * 2);
-
-  if (sw < 20 || sH < 20) { alert('选区太小'); editLassoPts = []; renderEditor(); return; }
-
-  // 创建套索遮罩（白色=套索内，黑色=外）
-  const maskCvs = document.createElement('canvas'); maskCvs.width = sw; maskCvs.height = sH;
-  const maskCtx2 = maskCvs.getContext('2d');
-  // 偏移套索坐标到裁剪区域
-  const localPts = editLassoPts.map(p => ({ x: p.x - sx, y: p.y - sy }));
-  maskCtx2.fillStyle = '#fff';
-  maskCtx2.beginPath();
-  maskCtx2.moveTo(localPts[0].x, localPts[0].y);
-  for (let i = 1; i < localPts.length; i++) maskCtx2.lineTo(localPts[i].x, localPts[i].y);
-  maskCtx2.fill();
-
-  // 裁剪原图
-  const cropCvs = document.createElement('canvas'); cropCvs.width = sw; cropCvs.height = sH;
-  const cropCtx = cropCvs.getContext('2d');
-  cropCtx.drawImage(editOrigImg, sx, sy, sw, sH, 0, 0, sw, sH);
-
-  // 将套索外区域涂黑（帮助 AI 聚焦）
-  const cropData = cropCtx.getImageData(0, 0, sw, sH);
-  const maskData = maskCtx2.getImageData(0, 0, sw, sH);
-  for (let i = 0; i < cropData.data.length; i += 4) {
-    if (maskData.data[i] < 128) {
-      cropData.data[i] = cropData.data[i+1] = cropData.data[i+2] = 0;
-    }
-  }
-  cropCtx.putImageData(cropData, 0, 0);
-  const cropBlob = await new Promise(res => cropCvs.toBlob(res, 'image/png'));
-
-  editorHint.textContent = '🤖 AI 识别套索区域边缘中…';
-  $('aiProgress').style.display = 'inline';
-  $('btnAiRetry').disabled = true;
-  try {
-    const aiBlob = await removeBackgroundFn(cropBlob, { output: { format: 'image/png' } });
-    const aiImg = await new Promise((resolve, reject) => {
-      const img = new Image(); img.onload = () => resolve(img); img.onerror = reject;
-      img.src = URL.createObjectURL(aiBlob);
-    });
-
-    // 将 AI 结果合成回去
-    editUndoStack.push(editMaskCtx.getImageData(0, 0, editMaskCvs.width, editMaskCvs.height));
-
-    const tmpCvs = document.createElement('canvas'); tmpCvs.width = sw; tmpCvs.height = sH;
-    const tmpCtx = tmpCvs.getContext('2d');
-    tmpCtx.drawImage(aiImg, 0, 0);
-    const aiData = tmpCtx.getImageData(0, 0, sw, sH);
-
-    // 更新遮罩：套索区域内，AI 认为不透明的地方 → mask=0（保留AI结果/透明）
-    //           套索区域内，AI 认为透明的地方 → 保持原样
-    const editMaskData = editMaskCtx.getImageData(sx, sy, sw, sH);
-    for (let dy = 0; dy < sH; dy++) {
-      for (let dx = 0; dx < sw; dx++) {
-        const idx = (dy * sw + dx) * 4;
-        const gx = sx + dx, gy = sy + dy;
-        if (isInsideLasso(gx, gy, editLassoPts)) {
-          // AI 结果：透明→擦除原图(mask=0)，不透明→保留原样(mask=保持不变)
-          if (aiData.data[idx + 3] < 64) {
-            editMaskData.data[idx] = 0; // 擦除
-          }
-          // 否则保持不变（AI 认为这里有物体）
-        }
+async function sharpenBlob(blob, strength) {
+  if (strength <= 0) return blob;
+  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(blob); });
+  const cvs = document.createElement('canvas'); cvs.width = img.naturalWidth; cvs.height = img.naturalHeight;
+  const ctx = cvs.getContext('2d'); ctx.drawImage(img, 0, 0);
+  const w = cvs.width, h = cvs.height;
+  const src = ctx.getImageData(0, 0, w, h);
+  const dst = ctx.createImageData(w, h);
+  const s = strength;
+  const k = [0, -s/4, 0, -s/4, 1+s, -s/4, 0, -s/4, 0];
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let r=0,g=0,b=0,a=0;
+      for (let ky=0;ky<3;ky++) for (let kx=0;kx<3;kx++) {
+        const sx2 = Math.min(w-1,Math.max(0,x+kx-1)), sy2 = Math.min(h-1,Math.max(0,y+ky-1));
+        const idx = (sy2*w+sx2)*4, kv = k[ky*3+kx];
+        r+=src.data[idx]*kv;g+=src.data[idx+1]*kv;b+=src.data[idx+2]*kv;a+=src.data[idx+3]*kv;
       }
+      const di=(y*w+x)*4;
+      dst.data[di]=Math.min(255,Math.max(0,r));dst.data[di+1]=Math.min(255,Math.max(0,g));
+      dst.data[di+2]=Math.min(255,Math.max(0,b));dst.data[di+3]=Math.min(255,Math.max(0,a));
     }
-    editMaskCtx.putImageData(editMaskData, sx, sy);
-    editorHint.textContent = '✅ AI 处理完成 · 可继续编辑或保存';
-  } catch (e) {
-    editorHint.textContent = '❌ AI 处理失败：' + e.message;
   }
-  $('aiProgress').style.display = 'none';
-  $('btnAiRetry').disabled = false;
-  editLassoPts = [];
-  renderEditor();
+  ctx.putImageData(dst,0,0);
+  return new Promise(r=>cvs.toBlob(r,'image/png'));
 }
-</script>
-
-<!-- 非阻塞加载 JSZip / FileSaver（国内镜像优先） -->
-<script>
-(function(){
-  const libs = [
-    { name:'JSZip',    files:['jszip@3.10.1/dist/jszip.min.js'] },
-    { name:'saveAs',   files:['file-saver@2.0.5/dist/FileSaver.min.js'] },
-  ];
-  const cdns = [
-    'https://registry.npmmirror.com',
-    'https://cdn.jsdelivr.net/npm',
-  ];
-
-  libs.forEach(lib => {
-    let tried = 0;
-    function tryNext() {
-      if (tried >= cdns.length * lib.files.length) return;
-      const cdnIdx = Math.floor(tried / lib.files.length);
-      const fileIdx = tried % lib.files.length;
-      const url = cdns[cdnIdx] + '/' + lib.files[fileIdx];
-      const s = document.createElement('script');
-      s.src = url;
-      s.onload = () => { console.log('✅ '+lib.name+' via '+cdns[cdnIdx]); };
-      s.onerror = () => { tried++; tryNext(); };
-      document.body.appendChild(s);
-    }
-    tryNext();
-  });
-})();
 </script>
 </body>
 </html>
