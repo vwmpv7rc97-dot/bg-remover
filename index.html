@@ -274,20 +274,21 @@ async function tryLoadUrl(url){
 (async function loadLocalAI(){
   const names=['esm.sh','npmmirror(阿里)','jsdelivr','fastly','unpkg','esm.run','jspm'];
   const statuses=names.map(n=>({name:n,state:'等待'}));
-  function updateUI(){
+  function refreshCDNStatus(){
     const done=statuses.filter(s=>s.state!=='等待').length;
     const ok=statuses.filter(s=>s.state==='✅').length;
-    if(ok>0)$('statusMsg').textContent=`AI 引擎就绪 (${ok}个CDN通) · 优先本地处理`;
-    else if(done===statuses.length)$('statusMsg').textContent='7个CDN全不通 · 可用云端API或Canvas引擎';
-    else $('statusMsg').textContent=`尝试加载 AI 引擎…(${done}/7)`;
+    if(ok>0)statusOverride=`AI 引擎就绪 (${ok}/7 CDN) · 优先本地AI`;
+    else if(done===statuses.length)statusOverride='7个CDN全不通 · 粘贴Token用云端API';
+    else statusOverride=`加载AI引擎… (${done}/7) — ${statuses.map(s=>s.state).join(' ')}`;
+    updateUI();
   }
-  updateUI();
+  refreshCDNStatus();
 
   const results=[];
   for(let i=0;i<AI_CDNS.length;i++){
-    statuses[i].state='加载中';updateUI();
+    statuses[i].state='⏳';refreshCDNStatus();
     const m=await tryLoadUrl(AI_CDNS[i]);
-    statuses[i].state=m?'✅':'❌';results.push(m);updateUI();
+    statuses[i].state=m?'✅':'❌';results.push(m);refreshCDNStatus();
   }
 
   const winner=results.find(r=>r);
@@ -626,11 +627,13 @@ async function processImage(id,tol){
   updateUI();
 }
 
+let statusOverride=''; // AI引擎加载状态（不被updateUI覆盖）
 function updateUI(){
   const all=Array.from(jobs.values());const done=all.filter(j=>j.status==='done');
   $('btnClear').disabled=!all.length;$('btnZip').disabled=!done.length;
   $('btnZip').textContent=`📦 下载 ZIP${done.length?` (${done.length})`:''}`;
-  $('statusMsg').textContent=all.length?`${done.length}/${all.length} 完成`:'就绪';
+  if(statusOverride)$('statusMsg').textContent=statusOverride;
+  else $('statusMsg').textContent=all.length?`${done.length}/${all.length} 完成`:'就绪';
   if(!all.length)$('emptyState').style.display='flex';
 }
 
