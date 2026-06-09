@@ -196,6 +196,7 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
       <span class="val" id="edScaleVal">100%</span>
       <button class="btn btn-glass btn-sm" onclick="edScaleUp()">＋ 放大</button>
       <button class="btn btn-glass btn-sm" onclick="edMoveReset()">🔄 重置</button>
+      <button class="btn btn-glass btn-sm" id="btnRegion" onclick="edRegionSelect()">🧩 分区域选</button>
       <span style="font-size:10px;color:#aaa">拖拽红色区域移动主体</span>
     </div>
     <!-- 涂抹修复选项 -->
@@ -1180,7 +1181,7 @@ async function edOpen(id){
   document.querySelector('[data-tool="move"]').classList.add('active');
   $('optMove').classList.remove('hide');$('optBrush').classList.add('hide');$('optRemove').classList.add('hide');
   $('edSharp').value=job.sharpenLevel??1;
-  edSharpBase=null; edRegions=[];edRegionMode=false;autoDetectRegions(); // 自动检测多区域
+  edSharpBase=null; edRegions=[];edRegionMode=false;
   edOver.classList.add('on');edZoomFit();updateZoomUI();renderEd();
 }
 
