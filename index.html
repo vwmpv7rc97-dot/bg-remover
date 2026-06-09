@@ -237,11 +237,14 @@ function dlBlob(b,n){const u=URL.createObjectURL(b),a=document.createElement('a'
 
 async function makeZip(files){
   const enc=new TextEncoder();const parts=[];const lh=[];const ch=[];let off=0;
+  const UTF8_FLAG=0x0800; // bit 11: UTF-8 filename encoding
   for(const f of files){
     const nb=enc.encode(f.name);const d=new Uint8Array(await f.blob.arrayBuffer());const crc=crc32(d);
-    const l=new Uint8Array(30+nb.length);l.set([0x50,0x4b,0x03,0x04],0);l.set([10,0],4);w16(l,10,0);w16(l,12,0);w32(l,14,crc);w32(l,18,d.length);w32(l,22,d.length);w16(l,26,nb.length);w16(l,28,0);l.set(nb,30);
+    // Local file header: version 2.0 + UTF-8 flag
+    const l=new Uint8Array(30+nb.length);l.set([0x50,0x4b,0x03,0x04],0);w16(l,4,20);w16(l,6,UTF8_FLAG);w16(l,8,0);w16(l,10,0);w16(l,12,0);w32(l,14,crc);w32(l,18,d.length);w32(l,22,d.length);w16(l,26,nb.length);w16(l,28,0);l.set(nb,30);
     parts.push(l);lh.push({o:off,s:l.length+d.length});parts.push(d);off+=l.length+d.length;
-    const c=new Uint8Array(46+nb.length);c.set([0x50,0x4b,0x01,0x02],0);c.set([10,0],4);c.set([10,0],6);w16(c,10,0);w16(c,12,0);w16(c,14,0);w16(c,16,0);w32(c,20,d.length);w32(c,24,d.length);w16(c,28,nb.length);w16(c,30,0);w16(c,32,0);w16(c,34,0);w16(c,36,0);w32(c,38,0);w32(c,42,lh[lh.length-1].o);c.set(nb,46);ch.push(c);
+    // Central directory: version 2.0 + UTF-8 flag
+    const c=new Uint8Array(46+nb.length);c.set([0x50,0x4b,0x01,0x02],0);w16(c,4,20);w16(c,6,20);w16(c,8,UTF8_FLAG);w16(c,10,0);w16(c,12,0);w16(c,14,0);w16(c,16,0);w32(c,20,d.length);w32(c,24,d.length);w16(c,28,nb.length);w16(c,30,0);w16(c,32,0);w16(c,34,0);w16(c,36,0);w32(c,38,0);w32(c,42,lh[lh.length-1].o);c.set(nb,46);ch.push(c);
   }
   const cdo=off,cds=ch.reduce((s,c)=>s+c.length,0);
   const e=new Uint8Array(22);e.set([0x50,0x4b,0x05,0x06],0);w16(e,8,files.length);w16(e,10,files.length);w32(e,12,cds);w32(e,16,cdo);
