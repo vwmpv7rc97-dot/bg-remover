@@ -920,14 +920,9 @@ async function edAiInpaint(){
 // ---- 涂抹 ----
 function paintAt(pos){
   if(!edMaskCtx)return;
-  // 应用 move/scale 逆变换，使涂抹跟随缩放后的主体
-  if(!edSubjectBox)edSubjectBox=getSubjectBounds();
-  const box=edSubjectBox;
-  const scx=box.x+box.w/2,scy=box.y+box.h/2;
-  const ix=(pos.x-scx-edMoveX)/edMoveScale+scx;
-  const iy=(pos.y-scy-edMoveY)/edMoveScale+scy;
+  // mask 在 renderEd 中于变换前合成，此处直接用图像坐标
   const r=(edTool==='remove'?parseInt($('removeBrush').value)||20:edBrush)/2;
-  edMaskCtx.beginPath();edMaskCtx.arc(ix,iy,r,0,Math.PI*2);
+  edMaskCtx.beginPath();edMaskCtx.arc(pos.x,pos.y,r,0,Math.PI*2);
   if(edTool==='remove')edMaskCtx.fillStyle='#000';
   else edMaskCtx.fillStyle=edBrushMode==='restore'?'#fff':'#000';
   edMaskCtx.fill();
