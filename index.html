@@ -163,7 +163,7 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
     <span class="tit">✏️ 编辑</span>
     <div class="btns" style="display:flex;align-items:center;gap:4px">
       <button class="btn btn-glass btn-sm" onclick="edZoomOut()" title="缩小">－</button>
-      <span id="edZoomVal" style="font-size:11px;color:#fff;min-width:38px;text-align:center">100%</span>
+      <span id="edZoomVal" style="font-size:11px;color:#1a1a2e;min-width:38px;text-align:center;font-weight:600">100%</span>
       <button class="btn btn-glass btn-sm" onclick="edZoomIn()" title="放大">＋</button>
       <button class="btn btn-glass btn-sm" onclick="edZoomFit()" title="适应屏幕">⊡</button>
       <span style="color:rgba(255,255,255,.15);margin:0 4px">|</span>
@@ -200,17 +200,19 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
       <button class="btn btn-glass btn-sm ed-bmode active" data-bm="restore">🖌 恢复</button>
       <button class="btn btn-glass btn-sm ed-bmode" data-bm="erase">🧹 擦除</button>
       <label style="margin-left:4px">笔刷</label><input type="range" id="edBrush" min="3" max="100" value="25"><span class="val" id="edBrushVal">25px</span>
-      <span style="color:rgba(0,0,0,.15);margin:0 4px">|</span>
-      <label>✨ 清晰度</label>
-      <select id="edSharp" class="sharp-sel" onchange="onSharpChange()">
-        <option value="0">关</option><option value="0.5">轻</option><option value="1" selected>标准</option><option value="1.5">强</option><option value="2">最强</option>
-      </select>
     </div>
     <!-- 内容消除选项 -->
     <div class="ed-opts hide" id="optRemove">
       <label>笔刷</label><input type="range" id="removeBrush" min="5" max="80" value="20"><span class="val" id="removeBrushVal">20px</span>
       <button class="btn btn-glass btn-sm" onclick="edInpaint()">✨ 智能填充</button>
       <button class="btn btn-accent btn-sm" id="btnAiRemove" onclick="edAiInpaint()">🤖 AI 消除</button>
+    </div>
+    <!-- 清晰度（独立按钮行） -->
+    <div class="ed-opts" id="optSharp">
+      <label>✨ 清晰度</label>
+      <select id="edSharp" class="sharp-sel" onchange="onSharpChange()">
+        <option value="0">关</option><option value="0.5">轻</option><option value="1" selected>标准</option><option value="1.5">强</option><option value="2">最强</option>
+      </select>
     </div>
   </div>
 </div>
