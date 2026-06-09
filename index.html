@@ -655,6 +655,7 @@ let edId=null,edOrig=null,edResult=null,edMaskCvs=null,edMaskCtx=null;
 let edTool='move'; // move | brush | remove
 let edMoveX=0,edMoveY=0,edMoveScale=1;
 let edSubjectBox=null; // 缓存主体包围盒，避免每帧扫描
+let edLastPos=null; // 上次涂抹位置，用于连线
 let edBrushMode='restore',edBrush=25,edPainting=false,edUndoStack=[];
 let edZoom=1,edPX=0,edPY=0,edPanning=false,edPanStart=null,edShowOrig=false;
 let edSelMask=null; // 选区遮罩（ImageData），非null=有选区
@@ -663,7 +664,7 @@ let edSelMask=null; // 选区遮罩（ImageData），非null=有选区
 document.querySelectorAll('.ed-tool-btn').forEach(b=>b.addEventListener('click',function(){
   document.querySelectorAll('.ed-tool-btn').forEach(x=>x.classList.remove('active'));
   this.classList.add('active');edTool=this.dataset.tool;
-  edSelMask=null; // 切换工具清选区
+  edSelMask=null;edLastPos=null; // 切换工具清选区+断点
   $('optMove').classList.toggle('hide',edTool!=='move');
   $('optBrush').classList.toggle('hide',edTool!=='brush');
   $('optRemove').classList.toggle('hide',edTool!=='remove');
@@ -717,7 +718,7 @@ edCvs.addEventListener('mousemove',e=>{
   renderEd();
   e.preventDefault();
 });
-window.addEventListener('mouseup',()=>{edPainting=false;edPanning=false});
+window.addEventListener('mouseup',()=>{edPainting=false;edPanning=false;edLastPos=null});
 edCvs.addEventListener('wheel',e=>{e.preventDefault();const mx=canvasX(e.clientX),my=canvasY(e.clientY);const ox=(mx-edPX)/edZoom,oy=(my-edPY)/edZoom;edZoom=Math.max(0.2,Math.min(5,edZoom*(e.deltaY>0?0.9:1.1)));edPX=mx-ox*edZoom;edPY=my-oy*edZoom;updateZoomUI();renderEd()});
 edCvs.addEventListener('contextmenu',e=>e.preventDefault());
 
@@ -730,7 +731,7 @@ edCvs.addEventListener('touchmove',e=>{
   if(edPanning&&e.touches.length===2){const mx=canvasX((e.touches[0].clientX+e.touches[1].clientX)/2),my=canvasY((e.touches[0].clientY+e.touches[1].clientY)/2);edPX=mx-edPanStart.x;edPY=my-edPanStart.y;renderEd();return}
   if(edPainting&&e.touches.length===1){paintAt(touchPos(e.touches[0]));renderEd();e.preventDefault()}
 },{passive:false});
-edCvs.addEventListener('touchend',()=>{edPainting=false;edPanning=false});
+edCvs.addEventListener('touchend',()=>{edPainting=false;edPanning=false;edLastPos=null});
 
 // 统一坐标换算：屏幕像素 → Canvas 内部像素 → 图片像素（考虑 pan/zoom）
 function canvasX(clientX){const r=edCvs.getBoundingClientRect();return(clientX-r.left)*(edCvs.width/r.width)}
@@ -920,12 +921,16 @@ async function edAiInpaint(){
 // ---- 涂抹 ----
 function paintAt(pos){
   if(!edMaskCtx)return;
-  // mask 在 renderEd 中于变换前合成，此处直接用图像坐标
   const r=(edTool==='remove'?parseInt($('removeBrush').value)||20:edBrush)/2;
-  edMaskCtx.beginPath();edMaskCtx.arc(pos.x,pos.y,r,0,Math.PI*2);
-  if(edTool==='remove')edMaskCtx.fillStyle='#000';
-  else edMaskCtx.fillStyle=edBrushMode==='restore'?'#fff':'#000';
-  edMaskCtx.fill();
+  const color=edTool==='remove'?'#000':(edBrushMode==='restore'?'#fff':'#000');
+  edMaskCtx.fillStyle=color;edMaskCtx.strokeStyle=color;
+  edMaskCtx.lineWidth=r*2;edMaskCtx.lineCap='round';edMaskCtx.lineJoin='round';
+  if(edLastPos){
+    edMaskCtx.beginPath();edMaskCtx.moveTo(edLastPos.x,edLastPos.y);edMaskCtx.lineTo(pos.x,pos.y);edMaskCtx.stroke();
+  }else{
+    edMaskCtx.beginPath();edMaskCtx.arc(pos.x,pos.y,r,0,Math.PI*2);edMaskCtx.fill();
+  }
+  edLastPos={x:pos.x,y:pos.y};
   renderEd();
 }
 
