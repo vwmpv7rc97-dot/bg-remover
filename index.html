@@ -187,7 +187,7 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
         <span style="font-size:20px">🖌️</span>涂抹修复
       </button>
       <button class="ed-tool-btn" data-tool="remove">
-        <span style="font-size:20px">🧹</span>内容消除
+        <span style="font-size:20px">🧹</span>路人消除
       </button>
     </div>
     <!-- 移动缩放选项 -->
@@ -204,11 +204,12 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
       <button class="btn btn-glass btn-sm ed-bmode" data-bm="erase">🧹 擦除</button>
       <label style="margin-left:4px">笔刷</label><input type="range" id="edBrush" min="3" max="100" value="25"><span class="val" id="edBrushVal">25px</span>
     </div>
-    <!-- 内容消除选项 -->
+    <!-- 路人消除选项 -->
     <div class="ed-opts hide" id="optRemove">
       <label>笔刷</label><input type="range" id="removeBrush" min="5" max="80" value="20"><span class="val" id="removeBrushVal">20px</span>
-      <button class="btn btn-glass btn-sm" onclick="edInpaint()">✨ 智能填充</button>
-      <button class="btn btn-accent btn-sm" id="btnAiRemove" onclick="edAiInpaint()">🤖 AI 消除</button>
+      <button class="btn btn-glass btn-sm" onclick="edInpaint()" title="用周围像素填充涂抹区域">✨ 自动填充</button>
+      <button class="btn btn-accent btn-sm" id="btnAiRemove" onclick="edAiInpaint()" title="AI生成替换涂抹区域">🤖 AI 路人消除</button>
+      <span style="font-size:9px;color:var(--text-secondary)">涂抹路人/水印 → 点自动填充（秒出）或AI消除（需Token）</span>
     </div>
     <!-- 清晰度（独立按钮行） -->
     <div class="ed-opts" id="optSharp">
@@ -1143,14 +1144,24 @@ function applyRegionMask(){
   edMaskCtx.putImageData(md,0,0);
 }
 
+const MAX_EDIT_PX=1024; // 编辑尺寸上限，超出降采样保证跟手
+let edDownScale=1; // 降采样比例
+
 async function edOpen(id){
   const job=jobs.get(id);if(!job?.resultBlob)return;
   edId=id;edUndoStack=[];edZoom=1;edPX=0;edPY=0;edShowOrig=false;edSelMask=null;
   $('edViewBtn').textContent='🔄 原图';
-  $('edHint').textContent=job.aiMask?'🤖 AI 已预处理 · 点击智能选取或涂抹微调':'点击要选取的区域 · 调整容差 · 点删除';
   edOrig=await loadImage(job.blobUrl);
   edResult=await loadImage(job.resultUrl);
-  const w=edResult.naturalWidth,h=edResult.naturalHeight;
+  const rw=edResult.naturalWidth,rh=edResult.naturalHeight;
+  // 大图降采样，保证涂抹跟手
+  edDownScale=Math.max(rw,rh)>MAX_EDIT_PX?MAX_EDIT_PX/Math.max(rw,rh):1;
+  const w=Math.round(rw*edDownScale),h=Math.round(rh*edDownScale);
+  // 缩放原图和结果到编辑尺寸
+  if(edDownScale<1){
+    const sc=document.createElement('canvas');sc.width=w;sc.height=h;const sx=sc.getContext('2d');sx.drawImage(edOrig,0,0,w,h);edOrig=await loadImage(await new Promise(r=>sc.toBlob(r)));
+    const sc2=document.createElement('canvas');sc2.width=w;sc2.height=h;const sx2=sc2.getContext('2d');sx2.drawImage(edResult,0,0,w,h);edResult=await loadImage(await new Promise(r=>sc2.toBlob(r)));
+  }
   edMaskCvs=document.createElement('canvas');edMaskCvs.width=w;edMaskCvs.height=h;
   edMaskCtx=edMaskCvs.getContext('2d');edMaskCtx.fillStyle='#000';edMaskCtx.fillRect(0,0,w,h);
   // 如果有 AI mask，把 AI 认为的前景标记为已恢复（白色=保留）
@@ -1177,24 +1188,24 @@ function edClose(){edOver.classList.remove('on');edId=null}
 
 async function edSave(){
   if(!edId)return;const job=jobs.get(edId);
-  const w=edCvs.width,h=edCvs.height;
-  const out=document.createElement('canvas');out.width=w;out.height=h;
+  const ew=edCvs.width,eh=edCvs.height;
+  // 还原到原图分辨率
+  const rw=Math.round(ew/edDownScale),rh=Math.round(eh/edDownScale);
+  const out=document.createElement('canvas');out.width=rw;out.height=rh;
   const octx=out.getContext('2d');
+  // 从原 job 加载原始分辨率结果
+  const origResult=await loadImage(job.resultUrl);
+  octx.drawImage(origResult,0,0,rw,rh);
 
-  // 烘焙 move/scale
-  const box=getSubjectBounds();const scx=box.x+box.w/2,scy=box.y+box.h/2;
-  octx.save();
-  octx.translate(scx+edMoveX,scy+edMoveY);
-  octx.scale(edMoveScale,edMoveScale);
-  octx.translate(-scx,-scy);
-  octx.drawImage(edResult,0,0);
-  octx.restore();
+  // 放大 mask 到原始分辨率
+  const maskUp=document.createElement('canvas');maskUp.width=rw;maskUp.height=rh;
+  const mux=maskUp.getContext('2d');mux.drawImage(edMaskCvs,0,0,rw,rh);
+  const mdata=mux.getImageData(0,0,rw,rh);
 
-  const idata=octx.getImageData(0,0,w,h);
-  const mdata=edMaskCtx.getImageData(0,0,w,h);
-  const oc=document.createElement('canvas');oc.width=w;oc.height=h;
-  const ocx=oc.getContext('2d');ocx.drawImage(edOrig,0,0);
-  const odata=ocx.getImageData(0,0,w,h);
+  const idata=octx.getImageData(0,0,rw,rh);
+  const oc=document.createElement('canvas');oc.width=rw;oc.height=rh;
+  const ocx=oc.getContext('2d');ocx.drawImage(await loadImage(job.blobUrl),0,0,rw,rh);
+  const odata=ocx.getImageData(0,0,rw,rh);
   for(let i=0;i<mdata.data.length;i+=4){
     if(mdata.data[i]>128){idata.data[i]=odata.data[i];idata.data[i+1]=odata.data[i+1];idata.data[i+2]=odata.data[i+2];idata.data[i+3]=odata.data[i+3]}
   }
