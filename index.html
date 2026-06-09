@@ -245,10 +245,10 @@ let JSZipLib=null;
 })();
 
 async function makeZip(files){
-  if(!JSZipLib)throw new Error('ZIP组件加载中，请稍后重试');
+  if(!JSZipLib)throw new Error('ZIP组件加载中');
   const zip=new JSZipLib();const seen=new Map();
   for(const f of files){let n=f.name;if(seen.has(n)){let i=1;const b=n.replace(/\.[^.]+$/,''),e=n.split('.').pop();while(seen.has(`${b}（${i}）.${e}`))i++;n=`${b}（${i}）.${e}`}seen.set(n,true);zip.file(n,f.blob)}
-  return await zip.generateAsync({type:'blob'});
+  return await zip.generateAsync({type:'blob',compression:'STORE'});
 }
 
 // ===== 本地 AI 引擎加载（多 CDN 并行 + fetch 兜底） =====
@@ -646,8 +646,13 @@ function dlOne(id){const j=jobs.get(id);if(j?.resultBlob)dlBlob(j.resultBlob,j.f
 async function downloadZip(){
   const done=Array.from(jobs.values()).filter(j=>j.status==='done'&&j.resultBlob);
   if(!done.length)return;
-  try{const z=[];const seen=new Map();for(const j of done){let n=j.file.name.replace(/\.[^.]+$/,'')+'（扣图版）.png';if(seen.has(n)){let c=1;while(seen.has(n.replace('（扣图版）',`（${c}）（扣图版）`)))c++;n=n.replace('（扣图版）',`（${c}）（扣图版）`)}seen.set(n,true);z.push({name:n,blob:j.resultBlob})};dlBlob(await makeZip(z),'抠图结果.zip')}
-  catch(e){alert('ZIP打包失败：'+e.message+'\n请等待JSZip加载完成或逐张下载')}
+  if(!JSZipLib){alert('ZIP组件加载中，请稍后重试。或点击每张图片的「下载」按钮逐张保存');return}
+  try{
+    const zip=new JSZipLib();const seen=new Map();
+    for(const j of done){let n=j.file.name.replace(/\.[^.]+$/,'')+'（扣图版）.png';if(seen.has(n)){let c=1;while(seen.has(n.replace('（扣图版）',`（${c}）（扣图版）`)))c++;n=n.replace('（扣图版）',`（${c}）（扣图版）`)}seen.set(n,true);zip.file(n,j.resultBlob)}
+    const blob=await zip.generateAsync({type:'blob',compression:'STORE'});
+    dlBlob(blob,'抠图结果.zip');
+  }catch(e){alert('ZIP打包失败：'+e.message);console.error(e)}
 }
 // ===== 编辑模式 =====
 const edOver=$('edOverlay'),edCvs=$('edCanvas'),edCtx=edCvs.getContext('2d');
