@@ -174,17 +174,11 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
   <div class="ed-hint" id="edHint">轻点选择区域 · 长按涂抹 · 双指缩放平移</div>
   <div class="ed-bottom">
     <div class="ed-tools" id="edTools">
-      <button class="ed-tool-btn active" data-tool="transform">
-        <span style="font-size:20px">↔️</span>变换
-      </button>
-      <button class="ed-tool-btn" data-tool="brush">
+      <button class="ed-tool-btn active" data-tool="brush">
         <span style="font-size:20px">🖌️</span>涂抹修复
       </button>
       <button class="ed-tool-btn" data-tool="remove">
         <span style="font-size:20px">🧹</span>内容消除
-      </button>
-      <button class="ed-tool-btn" data-tool="transform">
-        <span style="font-size:20px">↔️</span>变换
       </button>
     </div>
     <!-- 涂抹修复选项 -->
@@ -198,13 +192,6 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
       <label>笔刷</label><input type="range" id="removeBrush" min="5" max="80" value="20"><span class="val" id="removeBrushVal">20px</span>
       <button class="btn btn-glass btn-sm" onclick="edInpaint()">✨ 智能填充</button>
       <button class="btn btn-accent btn-sm" id="btnAiRemove" onclick="edAiInpaint()">🤖 AI 消除</button>
-    </div>
-    <!-- 变换选项 -->
-    <div class="ed-opts hide" id="optTransform">
-      <button class="btn btn-glass btn-sm" onclick="edTransformReset()">🔄 重置</button>
-      <button class="btn btn-glass btn-sm" onclick="edTransformFlipH()">↔ 水平翻转</button>
-      <button class="btn btn-glass btn-sm" onclick="edTransformFlipV()">↕ 垂直翻转</button>
-      <span style="font-size:11px;color:#aaa">拖拽角点缩放 · 拖拽↻旋转 · 拖拽内部移动</span>
     </div>
   </div>
 </div>
@@ -575,7 +562,7 @@ async function downloadZip(){
 // ===== 编辑模式 =====
 const edOver=$('edOverlay'),edCvs=$('edCanvas'),edCtx=edCvs.getContext('2d');
 let edId=null,edOrig=null,edResult=null,edMaskCvs=null,edMaskCtx=null;
-let edTool='transform'; // transform | brush | remove
+let edTool='brush'; // brush | remove
 let edBrushMode='restore',edBrush=25,edPainting=false,edUndoStack=[];
 let edZoom=1,edPX=0,edPY=0,edPanning=false,edPanStart=null,edShowOrig=false;
 let edSelMask=null; // 选区遮罩（ImageData），非null=有选区
@@ -587,10 +574,8 @@ document.querySelectorAll('.ed-tool-btn').forEach(b=>b.addEventListener('click',
   edSelMask=null; // 切换工具清选区
   $('optBrush').classList.toggle('hide',edTool!=='brush');
   $('optRemove').classList.toggle('hide',edTool!=='remove');
-  $('optTransform').classList.toggle('hide',edTool!=='transform');
-  if(edTool==='transform')initTransform();
-  $('edHint').textContent=edTool==='transform'?'拖拽角点缩放 · 拖拽↻旋转 · 拖拽内部移动':edTool==='brush'?'涂抹恢复原图或擦除透明':edTool==='remove'?'涂抹要消除的内容 · 点智能填充':'';
-  edCvs.style.cursor=edTool==='transform'?'default':'crosshair';
+  $('edHint').textContent=edTool==='brush'?'涂抹恢复原图或擦除透明':edTool==='remove'?'涂抹要消除的内容 · 点智能填充':'';
+  edCvs.style.cursor='crosshair';
   renderEd();
 }));
 
@@ -610,23 +595,17 @@ edCvs.addEventListener('mousedown',e=>{
   if(e.button===2){edPanning=true;edPanStart={x:canvasX(e.clientX)-edPX,y:canvasY(e.clientY)-edPY};return}
   if(e.button!==0)return;
   const pos=edPos(e);
-  if(edTool==='transform'){
-    const h=getHandleAt(pos);
-    if(h){edTfDrag=h;edTfStart={...pos};edTfOrig={...edTf};e.preventDefault();return}
-    edPanning=true;edPanStart={x:e.clientX-edPX,y:e.clientY-edPY};return;
-  }
   if(edTool==='brush'){edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));edPainting=true;paintAt(pos);}
   if(edTool==='remove'){edPainting=true;paintAt(pos);}
   e.preventDefault();
 });
 edCvs.addEventListener('mousemove',e=>{
   if(edPanning){edPX=canvasX(e.clientX)-edPanStart.x;edPY=canvasY(e.clientY)-edPanStart.y;renderEd();return}
-  if(edTfDrag){edTransformDrag(edPos(e));renderEd();e.preventDefault();return}
   if(edPainting)paintAt(edPos(e));
   renderEd();
   e.preventDefault();
 });
-window.addEventListener('mouseup',()=>{edPainting=false;edPanning=false;edTfDrag=null});
+window.addEventListener('mouseup',()=>{edPainting=false;edPanning=false});
 edCvs.addEventListener('wheel',e=>{e.preventDefault();const mx=canvasX(e.clientX),my=canvasY(e.clientY);const ox=(mx-edPX)/edZoom,oy=(my-edPY)/edZoom;edZoom=Math.max(0.2,Math.min(5,edZoom*(e.deltaY>0?0.9:1.1)));edPX=mx-ox*edZoom;edPY=my-oy*edZoom;updateZoomUI();renderEd()});
 edCvs.addEventListener('contextmenu',e=>e.preventDefault());
 
@@ -981,10 +960,9 @@ async function edOpen(id){
     $('edHint').textContent='🤖 AI 智能识别完成 · 可用涂抹微调边缘';
   }
   edCvs.width=w;edCvs.height=h;
-  edTool='transform';document.querySelectorAll('.ed-tool-btn').forEach(x=>x.classList.remove('active'));
-  document.querySelector('[data-tool="transform"]').classList.add('active');
-  $('optBrush').classList.add('hide');$('optRemove').classList.add('hide');$('optTransform').classList.remove('hide');
-  initTransform();
+  edTool='brush';document.querySelectorAll('.ed-tool-btn').forEach(x=>x.classList.remove('active'));
+  document.querySelector('[data-tool="brush"]').classList.add('active');
+  $('optBrush').classList.remove('hide');$('optRemove').classList.add('hide');
   edOver.classList.add('on');edZoomFit();updateZoomUI();renderEd();
 }
 
@@ -996,20 +974,7 @@ async function edSave(){
   const out=document.createElement('canvas');out.width=w;out.height=h;
   const octx=out.getContext('2d');
 
-  // 应用变换
-  const box=getSubjectBounds();
-  const tf=edTool==='transform'?edTf:{x:0,y:0,sx:1,sy:1,rot:0};
-  octx.save();
-  octx.translate(box.cx+tf.x,box.cy+tf.y);
-  octx.rotate(tf.rot*Math.PI/180);
-  octx.scale(tf.sx,tf.sy);
-  octx.translate(-box.cx,-box.cy);
   octx.drawImage(edResult,0,0);
-  octx.restore();
-
-  // 补回非主体区域（透明部分原样保留）
-  const full=document.createElement('canvas');full.width=w;full.height=h;
-  const fctx=full.getContext('2d');fctx.drawImage(edResult,0,0);
 
   const idata=octx.getImageData(0,0,w,h);
   const mdata=edMaskCtx.getImageData(0,0,w,h);
@@ -1043,38 +1008,6 @@ function renderEd(){
   }
   // 选区覆盖层（红色半透明）
   if(edSelMask){const od=edCtx.getImageData(0,0,w,h);for(let i=0;i<edSelMask.length;i+=4){if(edSelMask[i+3]>0){od.data[i]=Math.min(255,od.data[i]*0.3+180);od.data[i+1]=Math.min(255,od.data[i+1]*0.3);od.data[i+2]=Math.min(255,od.data[i+2]*0.3);od.data[i+3]=255}}edCtx.putImageData(od,0,0)}
-
-  // 变换模式：绘制变换后的主体 + 控制手柄
-  if(edTool==='transform'&&!edShowOrig){
-    const box=getSubjectBounds();
-    edCtx.save();
-    edCtx.translate(box.cx,box.cy);
-    edCtx.rotate(box.rad);
-    edCtx.scale(edTf.sx,edTf.sy);
-    edCtx.translate(-box.cx,-box.cy);
-    // 重绘结果图（变换后）
-    const cs2=8/edZoom;
-    for(let y=box.y;y<box.y+box.h;y+=cs2)for(let x=box.x;x<box.x+box.w;x+=cs2){
-      edCtx.fillStyle=((Math.floor(x/cs2)+Math.floor(y/cs2))%2===0)?'#ddd':'#fff';
-      edCtx.fillRect(x,y,cs2+1,cs2+1);
-    }
-    edCtx.globalAlpha=0.6;edCtx.drawImage(edResult,0,0);edCtx.globalAlpha=1;
-    edCtx.restore();
-
-    // 控制手柄
-    const b=getTfBox();
-    edCtx.strokeStyle='#5b9cf5';edCtx.lineWidth=2/edZoom;edCtx.setLineDash([6/edZoom,3/edZoom]);
-    edCtx.beginPath();for(let i=0;i<4;i++){const c=b.corners[i];edCtx[i===0?'moveTo':'lineTo'](c.x,c.y)}edCtx.closePath();edCtx.stroke();
-    edCtx.setLineDash([]);
-    // 角点
-    for(const c of b.corners){edCtx.fillStyle='#fff';edCtx.strokeStyle='#5b9cf5';edCtx.lineWidth=2/edZoom;edCtx.beginPath();edCtx.arc(c.x,c.y,6/edZoom,0,Math.PI*2);edCtx.fill();edCtx.stroke()}
-    // 旋转把手
-    const top={x:(b.corners[0].x+b.corners[1].x)/2,y:(b.corners[0].y+b.corners[1].y)/2};
-    const rh={x:top.x-b.sin*25/edZoom,y:top.y+b.cos*25/edZoom};
-    edCtx.strokeStyle='#f59e0b';edCtx.lineWidth=2/edZoom;
-    edCtx.beginPath();edCtx.moveTo(top.x,top.y);edCtx.lineTo(rh.x,rh.y);edCtx.stroke();
-    edCtx.fillStyle='#f59e0b';edCtx.beginPath();edCtx.arc(rh.x,rh.y,6/edZoom,0,Math.PI*2);edCtx.fill();
-  }
 
   edCtx.restore();
 }
