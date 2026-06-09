@@ -227,29 +227,8 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
 const $=id=>document.getElementById(id);
 const jobs=new Map();let jc=0;
 
-// ===== ZIP（动态加载 JSZip 库） =====
+// ===== ZIP（内联实现，零依赖） =====
 function dlBlob(b,n){const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=n;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(u),1000)}
-
-let JSZipLib=null;
-(function loadZIP(){
-  const urls=['https://registry.npmmirror.com/jszip/3.10.1/files/dist/jszip.min.js','https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js'];
-  let idx=0;
-  function tryNext(){
-    if(idx>=urls.length){console.warn('JSZip所有源加载失败');return}
-    const s=document.createElement('script');s.src=urls[idx];
-    s.onload=()=>{if(typeof JSZip!=='undefined'){JSZipLib=JSZip;console.log('JSZip OK')}else{idx++;tryNext()}};
-    s.onerror=()=>{idx++;tryNext()};
-    document.head.appendChild(s);
-  }
-  tryNext();
-})();
-
-async function makeZip(files){
-  if(!JSZipLib)throw new Error('ZIP组件加载中');
-  const zip=new JSZipLib();const seen=new Map();
-  for(const f of files){let n=f.name;if(seen.has(n)){let i=1;const b=n.replace(/\.[^.]+$/,''),e=n.split('.').pop();while(seen.has(`${b}（${i}）.${e}`))i++;n=`${b}（${i}）.${e}`}seen.set(n,true);zip.file(n,f.blob)}
-  return await zip.generateAsync({type:'blob',compression:'STORE'});
-}
 
 // ===== 本地 AI 引擎加载（多 CDN 并行 + fetch 兜底） =====
 let localAiFn=null; // @imgly/background-removal 的 removeBackground
@@ -646,12 +625,31 @@ function dlOne(id){const j=jobs.get(id);if(j?.resultBlob)dlBlob(j.resultBlob,j.f
 async function downloadZip(){
   const done=Array.from(jobs.values()).filter(j=>j.status==='done'&&j.resultBlob);
   if(!done.length)return;
-  if(!JSZipLib){alert('ZIP组件加载中，请稍后重试。或点击每张图片的「下载」按钮逐张保存');return}
   try{
-    const zip=new JSZipLib();const seen=new Map();
-    for(const j of done){let n=j.file.name.replace(/\.[^.]+$/,'')+'（扣图版）.png';if(seen.has(n)){let c=1;while(seen.has(n.replace('（扣图版）',`（${c}）（扣图版）`)))c++;n=n.replace('（扣图版）',`（${c}）（扣图版）`)}seen.set(n,true);zip.file(n,j.resultBlob)}
-    const blob=await zip.generateAsync({type:'blob',compression:'STORE'});
-    dlBlob(blob,'抠图结果.zip');
+    const enc=new TextEncoder();const bufs=[];const cd=[];let off=0;
+    const seen=new Map();
+    for(const j of done){
+      let fn=j.file.name.replace(/\.[^.]+$/,'')+'（扣图版）.png';
+      if(seen.has(fn)){let c=1;const b=fn.replace('（扣图版）.png','');while(seen.has(b+'（'+c+'）（扣图版）.png'))c++;fn=b+'（'+c+'）（扣图版）.png'}
+      seen.set(fn,true);
+      const nameBytes=enc.encode(fn);
+      const data=new Uint8Array(await j.resultBlob.arrayBuffer());
+      let crc=0xFFFFFFFF;for(let i=0;i<data.length;i++){crc^=data[i];for(let k=0;k<8;k++)crc=(crc>>>1)^(crc&1?0xEDB88320:0)}crc=(crc^0xFFFFFFFF)>>>0;
+      const lh=new Uint8Array(30+nameBytes.length);
+      const dv=new DataView(lh.buffer);dv.setUint32(0,0x04034b50,true);dv.setUint16(4,20,true);dv.setUint16(6,0x0800,true);dv.setUint16(8,0,true);dv.setUint16(10,0,true);dv.setUint16(12,0,true);dv.setUint32(14,crc,true);dv.setUint32(18,data.length,true);dv.setUint32(22,data.length,true);dv.setUint16(26,nameBytes.length,true);dv.setUint16(28,0,true);lh.set(nameBytes,30);
+      bufs.push(lh);bufs.push(data);
+      const lhOff=off;off+=lh.length+data.length;
+      const ce=new Uint8Array(46+nameBytes.length);
+      const cdv=new DataView(ce.buffer);cdv.setUint32(0,0x02014b50,true);cdv.setUint16(4,20,true);cdv.setUint16(6,20,true);cdv.setUint16(8,0x0800,true);cdv.setUint16(10,0,true);cdv.setUint16(12,0,true);cdv.setUint16(14,0,true);cdv.setUint32(16,crc,true);cdv.setUint32(20,data.length,true);cdv.setUint32(24,data.length,true);cdv.setUint16(28,nameBytes.length,true);cdv.setUint16(30,0,true);cdv.setUint16(32,0,true);cdv.setUint16(34,0,true);cdv.setUint32(42,lhOff,true);ce.set(nameBytes,46);cd.push(ce);
+    }
+    const cdOff=off;const cdSize=cd.reduce((s,c)=>s+c.length,0);
+    const eocd=new Uint8Array(22);
+    const ev=new DataView(eocd.buffer);ev.setUint32(0,0x06054b50,true);ev.setUint16(8,done.length,true);ev.setUint16(10,done.length,true);ev.setUint32(12,cdSize,true);ev.setUint32(16,cdOff,true);
+    const all=new Uint8Array(off+cdSize+22);let p=0;
+    for(const b of bufs){all.set(b,p);p+=b.length}
+    for(const c of cd){all.set(c,p);p+=c.length}
+    all.set(eocd,p);
+    dlBlob(new Blob([all],{type:'application/zip'}),'抠图结果.zip');
   }catch(e){alert('ZIP打包失败：'+e.message);console.error(e)}
 }
 // ===== 编辑模式 =====
