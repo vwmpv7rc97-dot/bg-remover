@@ -61,7 +61,9 @@ header p{font-size:15px;color:var(--text-secondary);margin-top:6px;font-weight:4
 .card:hover::before{opacity:.6}
 .card:hover{border-color:rgba(79,70,229,0.15);box-shadow:0 8px 32px rgba(79,70,229,0.08);transform:translateY(-2px)}
 .card.done{border-color:rgba(52,199,89,0.15)}
-.card-top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.card-sel{position:absolute;top:10px;left:10px;width:22px;height:22px;border-radius:50%;border:2px solid rgba(0,0,0,0.15);background:#fff;cursor:pointer;z-index:5;transition:all .15s;display:flex;align-items:center;justify-content:center;font-size:11px;color:transparent}
+.card-sel.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.card-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding-left:28px}
 .card-name{font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;color:var(--text)}
 .card-compare{display:flex;gap:8px}
 .card-img-wrap{flex:1;aspect-ratio:1;border-radius:16px;overflow:hidden;background:#f5f5f7;display:flex;align-items:center;justify-content:center;position:relative}
@@ -156,7 +158,9 @@ header p{font-size:15px;color:var(--text-secondary);margin-top:6px;font-weight:4
       <div><span class="dot" id="dot"></span><span id="statusMsg">就绪</span></div>
       <div id="cdnStatus" style="font-size:10px;color:var(--accent);margin-top:2px"></div>
     </div>
-    <div class="actions" style="display:flex;gap:8px">
+    <div class="actions" style="display:flex;gap:8px;align-items:center">
+      <button class="btn btn-glass btn-sm" id="btnSelAll" onclick="toggleSelectAll()" style="display:none">☐ 全选</button>
+      <span id="selCount" style="font-size:12px;color:var(--accent);font-weight:600;display:none"></span>
       <button class="btn btn-accent" id="btnZip" disabled>📦 下载 ZIP</button>
       <button class="btn btn-danger" id="btnClear" disabled>🗑 清空</button>
     </div>
@@ -570,7 +574,8 @@ async function handleFiles(fileList){
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
 function createCard(id,name,blobUrl){
   const card=document.createElement('div');card.className='card';card.id='card-'+id;
-  card.innerHTML=`<div class="card-top"><span class="card-name" title="${esc(name)}">${esc(name)}</span></div>
+  const selId='sel-'+id;
+  card.innerHTML=`<div class="card-sel" id="${selId}" onclick="event.stopPropagation();toggleCard(${id})">✓</div><div class="card-top"><span class="card-name" title="${esc(name)}">${esc(name)}</span></div>
     <div class="card-compare"><div class="card-img-wrap"><img src="${blobUrl}"></div><div class="card-img-wrap final" id="res-${id}"><span class="placeholder">处理中…</span></div></div>
     <div class="card-status" id="st-${id}">正在分析背景色…</div>
     <div class="card-actions" id="act-${id}"></div>`;
@@ -1210,14 +1215,31 @@ async function edOpen(id){
 
 function edClose(){edOver.classList.remove('on');edId=null}
 
+// 多选
+const selectedCards=new Set();
+function toggleCard(id){const s=$(`sel-${id}`);if(selectedCards.has(id)){selectedCards.delete(id);s.classList.remove('on')}else{selectedCards.add(id);s.classList.add('on')}updateSelUI()}
+function toggleSelectAll(){
+  const done=getDoneIds();
+  if(selectedCards.size===done.length){selectedCards.clear();done.forEach(id=>{const s=$(`sel-${id}`);if(s)s.classList.remove('on')})}
+  else{done.forEach(id=>{selectedCards.add(id);const s=$(`sel-${id}`);if(s)s.classList.add('on')})}
+  updateSelUI();
+}
+function updateSelUI(){
+  const done=getDoneIds();const n=selectedCards.size;
+  $('btnSelAll').style.display=done.length>1?'':'none';$('selCount').style.display=n>0?'':'none';
+  $('btnSelAll').textContent=n===done.length?'☑ 取消全选':'☐ 全选';$('selCount').textContent=`已选 ${n} 张`;
+}
+
 function getDoneIds(){return Array.from(jobs.keys()).filter(id=>jobs.get(id)?.status==='done')}
 function edPrev(){switchToImg(-1)}
 function edNext(){switchToImg(1)}
 async function switchToImg(dir){
-  if(!edId)return;edSave(); // 自动保存当前
-  const ids=getDoneIds();const idx=ids.indexOf(edId);
-  const newIdx=idx+dir;if(newIdx<0||newIdx>=ids.length)return;
-  edOpen(ids[newIdx]);
+  if(!edId)return;edSave();
+  // 有选中时只在选中的图片间切换
+  const pool=selectedCards.size>0?Array.from(selectedCards).filter(id=>jobs.get(id)?.status==='done'):getDoneIds();
+  const idx=pool.indexOf(edId);const newIdx=idx+dir;
+  if(newIdx<0||newIdx>=pool.length)return;
+  edOpen(pool[newIdx]);
 }
 function updateEdNav(){
   const ids=getDoneIds();const idx=ids.indexOf(edId);
