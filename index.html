@@ -1233,22 +1233,25 @@ function renderEd(){
   edCtx.clearRect(0,0,w,h);edCtx.save();edCtx.translate(edPX,edPY);edCtx.scale(edZoom,edZoom);
   if(edShowOrig){edCtx.drawImage(edOrig,0,0)}else{
     // 棋盘格背景
-    const cs=10/edZoom;
-    for(let y=0;y<h;y+=cs)for(let x=0;x<w;x+=cs){edCtx.fillStyle=((Math.floor(x/cs)+Math.floor(y/cs))%2===0)?'#ddd':'#fff';edCtx.fillRect(x,y,cs+1,cs+1)}
-    // 主体渲染：应用 move/scale 变换（缓存包围盒）
+    const cs=10/edZoom;for(let y=0;y<h;y+=cs)for(let x=0;x<w;x+=cs){edCtx.fillStyle=((Math.floor(x/cs)+Math.floor(y/cs))%2===0)?'#ddd':'#fff';edCtx.fillRect(x,y,cs+1,cs+1)}
+    // 先合成 mask（在全分辨率下），再变换
     if(!edSubjectBox)edSubjectBox=getSubjectBounds();
-    edCtx.save();
-    const box=edSubjectBox;const scx=box.x+box.w/2,scy=box.y+box.h/2;
-    edCtx.translate(scx+edMoveX,scy+edMoveY);edCtx.scale(edMoveScale,edMoveScale);edCtx.translate(-scx,-scy);
-    edCtx.drawImage(edResult,0,0);
-    edCtx.restore();
-    // 遮罩恢复（只在有 mask 变更时处理）
+    const box=edSubjectBox;
+    // 创建合成画布：结果 + mask恢复的原图部分
+    const comp=document.createElement('canvas');comp.width=w;comp.height=h;
+    const cx=comp.getContext('2d');cx.drawImage(edResult,0,0);
     if(edMaskCvs){
-      const od=edCtx.getImageData(0,0,w,h);const md=edMaskCtx.getImageData(0,0,w,h);
-      const oc=document.createElement('canvas');oc.width=w;oc.height=h;const ox=oc.getContext('2d');ox.drawImage(edOrig,0,0);const origD=ox.getImageData(0,0,w,h);
-      for(let i=0;i<md.data.length;i+=4){if(md.data[i]>128){od.data[i]=origD.data[i];od.data[i+1]=origD.data[i+1];od.data[i+2]=origD.data[i+2];od.data[i+3]=255}}
-      edCtx.putImageData(od,0,0);
+      const md=edMaskCtx.getImageData(0,0,w,h);const cd=cx.getImageData(0,0,w,h);
+      const oc=document.createElement('canvas');oc.width=w;oc.height=h;const ox=oc.getContext('2d');ox.drawImage(edOrig,0,0);const od=ox.getImageData(0,0,w,h);
+      for(let i=0;i<md.data.length;i+=4){if(md.data[i]>128){cd.data[i]=od.data[i];cd.data[i+1]=od.data[i+1];cd.data[i+2]=od.data[i+2];cd.data[i+3]=255}}
+      cx.putImageData(cd,0,0);
     }
+    // 应用 move/scale 变换绘制合成图
+    edCtx.save();
+    const scx=box.x+box.w/2,scy=box.y+box.h/2;
+    edCtx.translate(scx+edMoveX,scy+edMoveY);edCtx.scale(edMoveScale,edMoveScale);edCtx.translate(-scx,-scy);
+    edCtx.drawImage(comp,0,0);
+    edCtx.restore();
   }
   edCtx.restore();
 }
