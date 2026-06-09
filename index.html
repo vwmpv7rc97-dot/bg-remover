@@ -249,7 +249,7 @@ async function makeZip(files){
   const cdo=off,cds=ch.reduce((s,c)=>s+c.length,0);
   const e=new Uint8Array(22);e.set([0x50,0x4b,0x05,0x06],0);w16(e,8,files.length);w16(e,10,files.length);w32(e,12,cds);w32(e,16,cdo);
   const all=new Uint8Array(off+cds+22);let p=0;
-  for(const x of parts){all.set(new Uint8Array(x.buffer||x),p);p+=x.length}
+  for(const x of parts){all.set(x,p);p+=x.length}
   for(const c of ch){all.set(c,p);p+=c.length}
   all.set(e,p);return new Blob([all],{type:'application/zip'});
 }
