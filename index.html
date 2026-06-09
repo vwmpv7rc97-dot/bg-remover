@@ -163,6 +163,36 @@
   .card-actions{display:flex;gap:6px;justify-content:flex-end}
   .card-error-msg{font-size:10px;color:var(--error);letter-spacing:.03em;line-height:1.4}
 
+  /* ===== 编辑模式 ===== */
+  .editor-overlay{
+    position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.92);
+    display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .2s
+  }
+  .editor-overlay.active{opacity:1;pointer-events:auto}
+  .editor-topbar{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:10px 14px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06);
+    flex-wrap:wrap
+  }
+  .editor-title{font-size:14px;font-weight:600;color:var(--text);letter-spacing:.04em;white-space:nowrap}
+  .editor-tools{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .ed-mode.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .ed-sep{color:rgba(255,255,255,.1);font-size:14px}
+  .ed-label{font-size:11px;color:var(--text-secondary);letter-spacing:.03em}
+  .brush-slider{width:80px;accent-color:var(--accent)}
+  .editor-canvas-wrap{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;cursor:crosshair;padding:10px}
+  .editor-canvas-wrap.panning{cursor:grab}
+  .editor-canvas-wrap.panning:active{cursor:grabbing}
+  #editorCanvas{max-width:100%;max-height:100%;box-shadow:0 0 40px rgba(0,0,0,.5)}
+  .editor-hint{text-align:center;padding:8px;font-size:11px;color:var(--text-secondary);letter-spacing:.03em;background:rgba(255,255,255,.02)}
+
+  @media(max-width:500px){
+    .editor-topbar{gap:4px;padding:8px 10px}
+    .editor-tools{gap:4px}
+    .editor-tools .btn-sm{padding:5px 10px;font-size:11px}
+    .brush-slider{width:50px}
+  }
+
   /* ===== 响应式 ===== */
   /* 手机 */
   @media(max-width:500px){
@@ -239,6 +269,31 @@
     <div class="icon">📂</div>
     <p>拖拽图片或 ZIP 到上方区域<br>或按 Ctrl+V 粘贴剪贴板中的图片</p>
   </div>
+</div>
+
+<!-- 编辑模式 Overlay -->
+<div class="editor-overlay" id="editorOverlay">
+  <div class="editor-topbar">
+    <span class="editor-title">✏️ 编辑抠图</span>
+    <div class="editor-tools">
+      <button class="btn btn-glass btn-sm ed-mode active" data-mode="restore" id="modeRestore">🖌️ 恢复</button>
+      <button class="btn btn-glass btn-sm ed-mode" data-mode="erase" id="modeErase">🧹 擦除</button>
+      <button class="btn btn-glass btn-sm ed-mode" data-mode="circle" id="modeCircle">⭕ 圈选AI</button>
+      <span class="ed-sep">|</span>
+      <span class="ed-label">笔刷</span>
+      <input type="range" id="brushSize" min="5" max="120" value="30" class="brush-slider">
+      <span id="brushSizeLabel">30px</span>
+      <span class="ed-sep">|</span>
+      <button class="btn btn-accent btn-sm" id="btnAiRetry" style="display:none">🤖 AI重试</button>
+      <button class="btn btn-glass btn-sm" onclick="window._editorUndo()">↩ 撤销</button>
+      <button class="btn btn-accent btn-sm" onclick="window._editorSave()">💾 保存</button>
+      <button class="btn btn-glass btn-sm" onclick="window._editorClose()">✕ 关闭</button>
+    </div>
+  </div>
+  <div class="editor-canvas-wrap">
+    <canvas id="editorCanvas"></canvas>
+  </div>
+  <div class="editor-hint" id="editorHint">🖌️ 恢复模式：涂抹处恢复为原图 ｜ 滚轮缩放 ｜ 拖拽平移</div>
 </div>
 
 <script>
@@ -486,7 +541,8 @@ async function processImage(id) {
     progressBar.style.width = '100%';
     statusEl.textContent = '完成';
     $(`actions-${id}`).innerHTML =
-      `<button class="btn btn-glass btn-sm" onclick="window._download(${id})">💾 下载</button>`;
+      `<button class="btn btn-glass btn-sm" onclick="window._editOpen(${id})">✏️ 编辑</button>
+       <button class="btn btn-glass btn-sm" onclick="window._download(${id})">💾 下载</button>`;
 
   } catch (e) {
     job.status = 'error';
@@ -596,6 +652,275 @@ window._clearAll = function() {
   emptyState.style.display = 'flex';
   updateToolbar();
 };
+
+// ===== 编辑模式 =====
+const editorOverlay = $('editorOverlay');
+const editorCanvas = $('editorCanvas');
+const editorHint = $('editorHint');
+const ctx = editorCanvas.getContext('2d');
+
+let editJobId = null;
+let editOrigImg = null;    // 原始图 Image
+let editResultImg = null;  // 抠图结果 Image
+let editMaskCvs = null;    // 遮罩 canvas（0=透明/结果, 255=原图）
+let editMaskCtx = null;
+let editMode = 'restore';  // restore | erase | circle
+let editBrushSize = 30;
+let editPainting = false;
+let editCircleStart = null;
+let editCircleEnd = null;
+let editUndoStack = [];
+let editZoom = 1;
+let editPanX = 0, editPanY = 0;
+let editPanning = false;
+let editPanStart = null;
+
+// 初始化编辑器 UI 事件
+$('brushSize').addEventListener('input', e => {
+  editBrushSize = +e.target.value;
+  $('brushSizeLabel').textContent = editBrushSize + 'px';
+});
+document.querySelectorAll('.ed-mode').forEach(b => {
+  b.addEventListener('click', () => {
+    document.querySelectorAll('.ed-mode').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    editMode = b.dataset.mode;
+    editCircleStart = editCircleEnd = null;
+    $('btnAiRetry').style.display = editMode === 'circle' ? '' : 'none';
+    editorHint.textContent = editMode === 'restore' ? '🖌️ 恢复模式：涂抹处恢复为原图' :
+                             editMode === 'erase' ? '🧹 擦除模式：涂抹处变透明' :
+                             '⭕ 圈选模式：在图上拖拽画圈，然后点 AI重试';
+    editorCanvas.style.cursor = editMode === 'circle' ? 'crosshair' : 'crosshair';
+    renderEditor();
+  });
+});
+$('btnAiRetry').addEventListener('click', () => aiRetryCircle());
+
+// 画布事件
+editorCanvas.addEventListener('mousedown', e => { editorMouseDown(e); e.preventDefault(); });
+editorCanvas.addEventListener('mousemove', e => { editorMouseMove(e); e.preventDefault(); });
+window.addEventListener('mouseup', () => { editorMouseUp(); });
+editorCanvas.addEventListener('wheel', e => {
+  e.preventDefault();
+  const delta = e.deltaY > 0 ? 0.9 : 1.1;
+  editZoom = Math.max(0.2, Math.min(5, editZoom * delta));
+  renderEditor();
+});
+editorCanvas.addEventListener('contextmenu', e => e.preventDefault());
+
+window._editOpen = async function(id) {
+  const job = jobs.get(id);
+  if (!job || !job.resultBlob) return;
+  editJobId = id;
+  editUndoStack = [];
+  editZoom = 1; editPanX = 0; editPanY = 0;
+  editCircleStart = editCircleEnd = null;
+
+  // 加载原图和结果
+  const loadImg = src => new Promise((resolve, reject) => {
+    const i = new Image(); i.onload = () => resolve(i); i.onerror = reject; i.src = src;
+  });
+  editOrigImg = await loadImg(job.blobUrl);
+  editResultImg = await loadImg(job.resultUrl);
+
+  // 创建遮罩
+  const w = editResultImg.naturalWidth, h = editResultImg.naturalHeight;
+  editMaskCvs = document.createElement('canvas');
+  editMaskCvs.width = w; editMaskCvs.height = h;
+  editMaskCtx = editMaskCvs.getContext('2d');
+  editMaskCtx.fillStyle = '#000'; editMaskCtx.fillRect(0, 0, w, h);
+
+  editorCanvas.width = w; editorCanvas.height = h;
+  editorOverlay.classList.add('active');
+  renderEditor();
+};
+
+window._editorClose = function() {
+  editorOverlay.classList.remove('active');
+  editJobId = null;
+};
+
+window._editorSave = async function() {
+  if (!editJobId) return;
+  const job = jobs.get(editJobId);
+  // 合成最终图
+  const w = editorCanvas.width, h = editorCanvas.height;
+  const out = document.createElement('canvas'); out.width = w; out.height = h;
+  const octx = out.getContext('2d');
+  octx.drawImage(editResultImg, 0, 0);
+  const idata = octx.getImageData(0, 0, w, h);
+  const mdata = editMaskCtx.getImageData(0, 0, w, h);
+  const origCvs = document.createElement('canvas'); origCvs.width = w; origCvs.height = h;
+  const origCtx = origCvs.getContext('2d'); origCtx.drawImage(editOrigImg, 0, 0, w, h);
+  const odata = origCtx.getImageData(0, 0, w, h);
+  for (let i = 0; i < mdata.data.length; i += 4) {
+    if (mdata.data[i] > 128) {
+      idata.data[i] = odata.data[i];
+      idata.data[i+1] = odata.data[i+1];
+      idata.data[i+2] = odata.data[i+2];
+      idata.data[i+3] = odata.data[i+3];
+    }
+  }
+  octx.putImageData(idata, 0, 0);
+  const newBlob = await new Promise(r => out.toBlob(r, 'image/png'));
+  if (job.resultUrl) URL.revokeObjectURL(job.resultUrl);
+  job.resultBlob = newBlob;
+  job.resultUrl = URL.createObjectURL(newBlob);
+  $(`result-${editJobId}`).innerHTML = `<img src="${job.resultUrl}" alt="结果">`;
+  window._editorClose();
+};
+
+window._editorUndo = function() {
+  if (editUndoStack.length) {
+    const data = editUndoStack.pop();
+    editMaskCtx.putImageData(data, 0, 0);
+    renderEditor();
+  }
+};
+
+function renderEditor() {
+  const w = editorCanvas.width, h = editorCanvas.height;
+  ctx.clearRect(0, 0, w, h);
+  ctx.save();
+  ctx.translate(editPanX, editPanY);
+  ctx.scale(editZoom, editZoom);
+  // 棋盘格
+  const cs = 10;
+  for (let y = 0; y < h; y += cs) {
+    for (let x = 0; x < w; x += cs) {
+      ctx.fillStyle = ((x/cs + y/cs) % 2 === 0) ? '#ccc' : '#fff';
+      ctx.fillRect(x, y, cs, cs);
+    }
+  }
+  // 结果图
+  ctx.drawImage(editResultImg, 0, 0);
+  // 遮罩层（恢复区域叠加原图）
+  if (editMaskCvs) {
+    const idata = ctx.getImageData(0, 0, w, h);
+    const mdata = editMaskCtx.getImageData(0, 0, w, h);
+    const origCvs = document.createElement('canvas'); origCvs.width = w; origCvs.height = h;
+    const octx = origCvs.getContext('2d'); octx.drawImage(editOrigImg, 0, 0);
+    const odata = octx.getImageData(0, 0, w, h);
+    for (let i = 0; i < mdata.data.length; i += 4) {
+      if (mdata.data[i] > 128) {
+        idata.data[i] = odata.data[i];
+        idata.data[i+1] = odata.data[i+1];
+        idata.data[i+2] = odata.data[i+2];
+        idata.data[i+3] = odata.data[i+3];
+      }
+    }
+    ctx.putImageData(idata, 0, 0);
+  }
+  // 圈选提示
+  if (editMode === 'circle' && editCircleStart && editCircleEnd) {
+    const cx = (editCircleStart.x + editCircleEnd.x) / 2;
+    const cy = (editCircleStart.y + editCircleEnd.y) / 2;
+    const r = Math.hypot(editCircleEnd.x - editCircleStart.x, editCircleEnd.y - editCircleStart.y) / 2;
+    ctx.strokeStyle = '#5b9cf5'; ctx.lineWidth = 2 / editZoom;
+    ctx.setLineDash([6 / editZoom, 4 / editZoom]);
+    ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+  ctx.restore();
+}
+
+function canvasToImage(pos) {
+  const rect = editorCanvas.getBoundingClientRect();
+  return {
+    x: (pos.clientX - rect.left - editPanX) / editZoom,
+    y: (pos.clientY - rect.top - editPanY) / editZoom
+  };
+}
+
+function editorMouseDown(e) {
+  if (e.button === 2) { editPanning = true; editPanStart = { x: e.clientX - editPanX, y: e.clientY - editPanY }; return; }
+  if (e.button !== 0) return;
+  if (editMode === 'circle') {
+    editCircleStart = canvasToImage(e);
+    editCircleEnd = null;
+    return;
+  }
+  editPainting = true;
+  // 保存撤销
+  if (editMaskCvs) editUndoStack.push(editMaskCtx.getImageData(0, 0, editMaskCvs.width, editMaskCvs.height));
+  paintBrush(canvasToImage(e));
+}
+
+function editorMouseMove(e) {
+  if (editPanning) { editPanX = e.clientX - editPanStart.x; editPanY = e.clientY - editPanStart.y; renderEditor(); return; }
+  if (editMode === 'circle' && editCircleStart) {
+    editCircleEnd = canvasToImage(e);
+    renderEditor();
+    return;
+  }
+  if (editPainting) paintBrush(canvasToImage(e));
+}
+
+function editorMouseUp() {
+  editPainting = false;
+  editPanning = false;
+}
+
+function paintBrush(pos) {
+  if (!editMaskCtx) return;
+  const r = editBrushSize / 2;
+  editMaskCtx.beginPath();
+  editMaskCtx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+  editMaskCtx.fillStyle = editMode === 'restore' ? '#fff' : '#000';
+  editMaskCtx.fill();
+  renderEditor();
+}
+
+async function aiRetryCircle() {
+  if (!editCircleStart || !editCircleEnd || !editOrigImg || !editJobId) return;
+  const cx = Math.round((editCircleStart.x + editCircleEnd.x) / 2);
+  const cy = Math.round((editCircleStart.y + editCircleEnd.y) / 2);
+  const r = Math.round(Math.hypot(editCircleEnd.x - editCircleStart.x, editCircleEnd.y - editCircleStart.y) / 2);
+  if (r < 10) { alert('圈选区域太小，请画大一点'); return; }
+
+  const w = editOrigImg.naturalWidth, h = editOrigImg.naturalHeight;
+  // 裁剪圈选区域
+  const sx = Math.max(0, cx - r), sy = Math.max(0, cy - r);
+  const sw = Math.min(w - sx, r * 2), sH = Math.min(h - sy, r * 2);
+  const cropCvs = document.createElement('canvas'); cropCvs.width = sw; cropCvs.height = sH;
+  const cropCtx = cropCvs.getContext('2d');
+  cropCtx.drawImage(editOrigImg, sx, sy, sw, sH, 0, 0, sw, sH);
+  const cropBlob = await new Promise(res => cropCvs.toBlob(res, 'image/png'));
+
+  editorHint.textContent = '🤖 AI 处理圈选区域中…';
+  try {
+    const aiBlob = await removeBackgroundFn(cropBlob, { output: { format: 'image/png' } });
+    const aiImg = await new Promise((resolve, reject) => {
+      const img = new Image(); img.onload = () => resolve(img); img.onerror = reject;
+      img.src = URL.createObjectURL(aiBlob);
+    });
+    // 将 AI 结果合成回遮罩
+    editUndoStack.push(editMaskCtx.getImageData(0, 0, editMaskCvs.width, editMaskCvs.height));
+    // 创建圆形遮罩：圈内 AI 结果替代
+    const tmpCvs = document.createElement('canvas'); tmpCvs.width = sw; tmpCvs.height = sH;
+    const tmpCtx = tmpCvs.getContext('2d');
+    tmpCtx.drawImage(aiImg, 0, 0);
+    const aiData = tmpCtx.getImageData(0, 0, sw, sH);
+    const maskData = editMaskCtx.getImageData(sx, sy, sw, sH);
+    for (let dy = 0; dy < sH; dy++) {
+      for (let dx = 0; dx < sw; dx++) {
+        const gx = sx + dx, gy = sy + dy;
+        const dist = Math.hypot(gx - cx, gy - cy);
+        if (dist <= r) {
+          const idx = (dy * sw + dx) * 4;
+          // AI 结果透明 → mask=0（擦除），不透明 → mask=0（保持结果）
+          maskData.data[idx] = aiData.data[idx + 3] < 128 ? 0 : 0;
+        }
+      }
+    }
+    editMaskCtx.putImageData(maskData, sx, sy);
+    editorHint.textContent = '✅ AI 处理完成 · 可继续编辑或保存';
+  } catch (e) {
+    editorHint.textContent = '❌ AI 处理失败：' + e.message;
+  }
+  editCircleStart = editCircleEnd = null;
+  renderEditor();
+}
 </script>
 </body>
 </html>
