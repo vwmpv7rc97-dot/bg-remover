@@ -227,31 +227,21 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
 const $=id=>document.getElementById(id);
 const jobs=new Map();let jc=0;
 
-// ===== 内联 ZIP =====
-const crcTab=new Uint32Array(256);
-for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);crcTab[n]=c}
-function crc32(d){let c=0xFFFFFFFF;for(let i=0;i<d.length;i++)c=crcTab[(c^d[i])&0xFF]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
-function w16(a,o,v){a[o]=v&0xFF;a[o+1]=(v>>8)&0xFF}
-function w32(a,o,v){a[o]=v&0xFF;a[o+1]=(v>>8)&0xFF;a[o+2]=(v>>16)&0xFF;a[o+3]=(v>>24)&0xFF}
+// ===== ZIP（动态加载 JSZip 库） =====
 function dlBlob(b,n){const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=n;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(u),1000)}
 
-async function makeZip(files){
-  const enc=new TextEncoder();const parts=[];const lh=[];const ch=[];let off=0;
-  const UTF8_FLAG=0x0800; // bit 11: UTF-8 filename encoding
-  for(const f of files){
-    const nb=enc.encode(f.name);const d=new Uint8Array(await f.blob.arrayBuffer());const crc=crc32(d);
-    // Local file header: version 2.0 + UTF-8 flag
-    const l=new Uint8Array(30+nb.length);l.set([0x50,0x4b,0x03,0x04],0);w16(l,4,20);w16(l,6,UTF8_FLAG);w16(l,8,0);w16(l,10,0);w16(l,12,0);w32(l,14,crc);w32(l,18,d.length);w32(l,22,d.length);w16(l,26,nb.length);w16(l,28,0);l.set(nb,30);
-    parts.push(l);lh.push({o:off,s:l.length+d.length});parts.push(d);off+=l.length+d.length;
-    // Central directory: version 2.0 + UTF-8 flag
-    const c=new Uint8Array(46+nb.length);c.set([0x50,0x4b,0x01,0x02],0);w16(c,4,20);w16(c,6,20);w16(c,8,UTF8_FLAG);w16(c,10,0);w16(c,12,0);w16(c,14,0);w16(c,16,0);w32(c,20,d.length);w32(c,24,d.length);w16(c,28,nb.length);w16(c,30,0);w16(c,32,0);w16(c,34,0);w16(c,36,0);w32(c,38,0);w32(c,42,lh[lh.length-1].o);c.set(nb,46);ch.push(c);
+let JSZipLib=null;
+(async function loadZIP(){
+  for(const url of['https://registry.npmmirror.com/jszip/3.10.1/files/dist/jszip.min.js','https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js']){
+    try{await new Promise((res,rej)=>{const s=document.createElement('script');s.src=url;s.onload=()=>res();s.onerror=()=>rej(new Error());document.head.appendChild(s)});if(typeof JSZip!=='undefined'){JSZipLib=JSZip;return}}catch(e){}
   }
-  const cdo=off,cds=ch.reduce((s,c)=>s+c.length,0);
-  const e=new Uint8Array(22);e.set([0x50,0x4b,0x05,0x06],0);w16(e,8,files.length);w16(e,10,files.length);w32(e,12,cds);w32(e,16,cdo);
-  const all=new Uint8Array(off+cds+22);let p=0;
-  for(const x of parts){all.set(x,p);p+=x.length}
-  for(const c of ch){all.set(c,p);p+=c.length}
-  all.set(e,p);return new Blob([all],{type:'application/zip'});
+})();
+
+async function makeZip(files){
+  if(!JSZipLib)throw new Error('ZIP组件加载中，请稍后重试');
+  const zip=new JSZipLib();const seen=new Map();
+  for(const f of files){let n=f.name;if(seen.has(n)){let i=1;const b=n.replace(/\.[^.]+$/,''),e=n.split('.').pop();while(seen.has(`${b}（${i}）.${e}`))i++;n=`${b}（${i}）.${e}`}seen.set(n,true);zip.file(n,f.blob)}
+  return await zip.generateAsync({type:'blob'});
 }
 
 // ===== 本地 AI 引擎加载（多 CDN 并行 + fetch 兜底） =====
@@ -648,9 +638,9 @@ function updateUI(){
 function dlOne(id){const j=jobs.get(id);if(j?.resultBlob)dlBlob(j.resultBlob,j.file.name.replace(/\.[^.]+$/,'')+'（扣图版）.png')}
 async function downloadZip(){
   const done=Array.from(jobs.values()).filter(j=>j.status==='done'&&j.resultBlob);
-  if(!done.length)return;const z=[];const seen=new Map();
-  for(const j of done){let n=j.file.name.replace(/\.[^.]+$/,'')+'（扣图版）.png';if(seen.has(n)){let c=1;while(seen.has(n.replace('（扣图版）',`（${c}）（扣图版）`)))c++;n=n.replace('（扣图版）',`（${c}）（扣图版）`)}seen.set(n,true);z.push({name:n,blob:j.resultBlob})}
-  dlBlob(await makeZip(z),'抠图结果.zip');
+  if(!done.length)return;
+  try{const z=[];const seen=new Map();for(const j of done){let n=j.file.name.replace(/\.[^.]+$/,'')+'（扣图版）.png';if(seen.has(n)){let c=1;while(seen.has(n.replace('（扣图版）',`（${c}）（扣图版）`)))c++;n=n.replace('（扣图版）',`（${c}）（扣图版）`)}seen.set(n,true);z.push({name:n,blob:j.resultBlob})};dlBlob(await makeZip(z),'抠图结果.zip')}
+  catch(e){alert('ZIP打包失败：'+e.message+'\n请等待JSZip加载完成或逐张下载')}
 }
 // ===== 编辑模式 =====
 const edOver=$('edOverlay'),edCvs=$('edCanvas'),edCtx=edCvs.getContext('2d');
