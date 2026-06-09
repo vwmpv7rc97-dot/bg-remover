@@ -247,6 +247,37 @@ async function makeZip(files){
   all.set(e,p);return new Blob([all],{type:'application/zip'});
 }
 
+// ===== 本地 AI 引擎加载（多 CDN 并行 + fetch 兜底） =====
+let localAiFn=null; // @imgly/background-removal 的 removeBackground
+
+const AI_CDNS=[
+  'https://esm.sh/@imgly/background-removal@1.6.0',
+  'https://registry.npmmirror.com/@imgly/background-removal/1.6.0/files/dist/index.mjs',
+  'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.6.0/dist/index.mjs',
+  'https://fastly.jsdelivr.net/npm/@imgly/background-removal@1.6.0/dist/index.mjs',
+  'https://unpkg.com/@imgly/background-removal@1.6.0/dist/index.mjs',
+  'https://esm.run/@imgly/background-removal@1.6.0',
+  'https://ga.jspm.io/npm:@imgly/background-removal@1.6.0/dist/index.mjs',
+];
+
+async function tryLoadUrl(url){
+  // 方式1：直接 import
+  try{const m=await Promise.race([import(url),new Promise((_,r)=>setTimeout(()=>r(new Error()),6000))]);if(m.removeBackground)return m}catch(e){}
+  // 方式2：fetch 源码 → Blob URL → import
+  try{
+    const r=await Promise.race([fetch(url,{mode:'cors'}),new Promise((_,rj)=>setTimeout(()=>rj(new Error()),6000))]);
+    if(r.ok){const src=await r.text();const bu=URL.createObjectURL(new Blob([src],{type:'application/javascript'}));const m=await import(bu);URL.revokeObjectURL(bu);if(m.removeBackground)return m}
+  }catch(e){}
+  return null;
+}
+
+(async function loadLocalAI(){
+  $('statusMsg').textContent='尝试加载本地 AI 引擎…';
+  const results=await Promise.allSettled(AI_CDNS.map(u=>tryLoadUrl(u)));
+  const winner=results.find(r=>r.status==='fulfilled'&&r.value);
+  if(winner){localAiFn=winner.value.removeBackground;$('statusMsg').textContent='AI 引擎就绪 · 优先本地处理'};
+})();
+
 // ===== AI 抠图（魔搭 / HuggingFace 双 provider） =====
 async function removeBgAI(inputUrl, token, provider){
   const resp=await fetch(inputUrl);const imgBlob=await resp.blob();
@@ -534,20 +565,31 @@ async function processImage(id,tol){
   const job=jobs.get(id);if(!job)return;
   try{
     $(`st-${id}`).textContent='正在抠图…';
-    // 优先用 AI，失败回退 Canvas
     const aiToken=$('aiToken').value.trim();
     const aiProvider=$('aiProvider').value;
     let blob,aiMask=null;
-    if(aiToken){
+
+    // 1. 优先本地 AI（@imgly/background-removal，CDN 加载成功时最快最好）
+    if(localAiFn){
+      try{
+        $(`st-${id}`).textContent='🤖 本地 AI 抠图中…';
+        const resultBlob=await localAiFn(job.blobUrl,{output:{format:'image/png'}});
+        blob=resultBlob; // 本地AI直接输出透明PNG，无需mask合成
+      }catch(e){console.warn('本地AI失败:',e.message)}
+    }
+
+    // 2. 其次云端 API（ModelScope/HF）
+    if(!blob&&aiToken){
       try{
         $(`st-${id}`).textContent=`🤖 AI (${aiProvider==='modelscope'?'魔搭':'HF'}) 抠图中…`;
         const result=await removeBgAI(job.blobUrl,aiToken,aiProvider);
-        blob=result.blob;
-        aiMask=result.mask;
-        job.aiMask=aiMask;
-      }catch(e){console.warn('AI失败，回退Canvas:',e.message);$(`st-${id}`).textContent='AI失败，回退Canvas…'}
+        blob=result.blob;aiMask=result.mask;job.aiMask=aiMask;
+      }catch(e){console.warn('云端AI失败:',e.message)}
     }
+
+    // 3. 最后 Canvas 引擎
     if(!blob){
+      $(`st-${id}`).textContent='Canvas 抠图中…';
       blob=await removeBgCanvas(job.blobUrl,tol);
       job.aiMask=null;
     }
