@@ -230,44 +230,56 @@ async function makeZip(files){
 // ===== AI 抠图（魔搭 / HuggingFace 双 provider） =====
 async function removeBgAI(inputUrl, token, provider){
   const resp=await fetch(inputUrl);const imgBlob=await resp.blob();
+  const b64=await blobToBase64(imgBlob);
 
-  let apiResp;
+  let maskBlob=null;
+
   if(provider==='modelscope'){
-    // 魔搭 API（国内直连）
-    apiResp=await fetch('https://api.modelscope.cn/api/v1/models/briaai/RMBG-2.0/predictions',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
-      body:JSON.stringify({input:{image:await blobToBase64(imgBlob)}}),
-    });
-  }else{
-    // HuggingFace API
-    apiResp=await fetch('https://api-inference.huggingface.co/models/briaai/RMBG-2.0',{
-      method:'POST',
-      headers:{'Authorization':'Bearer '+token},
-      body:imgBlob,
-    });
-  }
+    // 魔搭 API — 尝试多种请求格式
+    const attempts=[
+      // 格式1：标准 ModelScope pipeline API
+      {
+        url:'https://api.modelscope.cn/api/v1/models/briaai/RMBG-2.0/predictions',
+        body:JSON.stringify({input:b64}),
+        parse:async(r)=>{const j=await r.json();const d=j.Data||j.data||{};return d.mask||d.output||d.result||''},
+      },
+      // 格式2：pipeline API 另一种格式
+      {
+        url:'https://api.modelscope.cn/api/v1/pipelines',
+        body:JSON.stringify({model:'briaai/RMBG-2.0',input:{image:b64}}),
+        parse:async(r)=>{const j=await r.json();return j.Data?.output||j.output||''},
+      },
+      // 格式3：直接二进制返回
+      {
+        url:'https://api.modelscope.cn/api/v1/models/briaai/RMBG-2.0/predictions',
+        body:JSON.stringify({image:b64}),
+        parse:async(r)=>{const b=await r.blob();return URL.createObjectURL(b)},
+      },
+    ];
 
-  if(!apiResp.ok){const err=await apiResp.text();throw new Error(`${apiResp.status}: ${err.slice(0,120)}`)}
-
-  // 解析响应获取 mask
-  let maskBlob;
-  const contentType=apiResp.headers.get('content-type')||'';
-  if(contentType.includes('application/json')){
-    // 魔搭返回 JSON
-    const json=await apiResp.json();
-    // 魔搭响应格式可能不同，尝试多种路径
-    const b64=json.Data?.mask||json.data?.mask||json.output?.mask||json.mask||'';
-    if(b64){
-      maskBlob=base64ToBlob(b64,'image/png');
-    }else{
-      // 可能直接返回了 image bytes
-      maskBlob=new Blob([new Uint8Array(Object.values(json))],{type:'image/png'});
+    for(const att of attempts){
+      try{
+        const ar=await fetch(att.url,{method:'POST',headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},body:att.body});
+        const result=await att.parse(ar);
+        if(result){
+          if(typeof result==='string'&&result.startsWith('blob:')){maskBlob=await fetch(result).then(r=>r.blob());break}
+          if(typeof result==='string'&&result.length>100){maskBlob=base64ToBlob(result,'image/png');break}
+        }
+      }catch(e){continue}
     }
+    if(!maskBlob)throw new Error('魔搭 API 所有格式均失败，请检查 Token 是否有效');
   }else{
-    maskBlob=await apiResp.blob();
+    // HuggingFace — 发送原始图片
+    const ar=await fetch('https://api-inference.huggingface.co/models/briaai/RMBG-2.0',{
+      method:'POST',headers:{'Authorization':'Bearer '+token},body:imgBlob,
+    });
+    if(!ar.ok){const e=await ar.text();throw new Error(`HF ${ar.status}: ${e.slice(0,100)}`)}
+    maskBlob=await ar.blob();
+    // HF 可能返回 JSON（模型加载中）
+    if(maskBlob.type.includes('json')){const j=JSON.parse(await maskBlob.text());throw new Error(j.error||'HF 模型加载中，请重试')}
   }
 
+  // 用 mask 合成透明 PNG
   const maskImg=await loadImage(URL.createObjectURL(maskBlob));
   const origImg=await loadImage(inputUrl);
   const w=origImg.naturalWidth,h=origImg.naturalHeight;
