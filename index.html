@@ -289,10 +289,27 @@ async function removeBgAI(inputUrl, token, provider){
   const mCtx=mCvs.getContext('2d');mCtx.drawImage(maskImg,0,0,w,h);
   const src=ctx.getImageData(0,0,w,h);
   const mask=mCtx.getImageData(0,0,w,h);
-  for(let i=0;i<src.data.length;i+=4){src.data[i+3]=mask.data[i]}
+
+  // 自动检测 mask 是否需要反转（如果白色像素>50%，说明白色=前景，直接用作alpha；否则反转）
+  let whiteCount=0;const total=mask.data.length/4;
+  for(let i=0;i<mask.data.length;i+=4){if(mask.data[i]>128)whiteCount++}
+  const invert=whiteCount>total*0.5; // 白色=背景 → 需要反转
+
+  for(let i=0;i<src.data.length;i+=4){
+    const v=mask.data[i]; // 取红色通道
+    src.data[i+3]=invert?(255-v):v;
+  }
   ctx.putImageData(src,0,0);
   const blob=await new Promise(r=>cvs.toBlob(r,'image/png'));
-  return {blob, mask:mCtx.getImageData(0,0,w,h)};
+
+  // 编辑器用的 mask（前景=255白色）
+  const edMask=new ImageData(w,h);
+  for(let i=0;i<edMask.data.length;i+=4){
+    const v=invert?(255-mask.data[i]):mask.data[i];
+    edMask.data[i]=edMask.data[i+1]=edMask.data[i+2]=v;edMask.data[i+3]=255;
+  }
+
+  return {blob, mask:edMask};
 }
 
 function blobToBase64(blob){
