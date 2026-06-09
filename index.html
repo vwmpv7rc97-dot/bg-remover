@@ -1114,7 +1114,6 @@ function edRegionSelect(){
   if(edRegionMode){edRegionMode=false;edRegions=[];$('edHint').textContent='区域选择已退出';renderEd();return}
   autoDetectRegions();
 }
-}
 
 function toggleRegionAt(pos){
   if(!edRegionMode||!edRegions.length)return;
