@@ -79,19 +79,28 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
 @media(min-width:901px){.grid{grid-template-columns:repeat(auto-fill,minmax(370px,1fr))}}
 
 /* 编辑模式 */
-.ed-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.94);display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .2s}
+.ed-overlay{position:fixed;inset:0;z-index:200;background:#000;display:flex;flex-direction:column;opacity:0;pointer-events:none;transition:opacity .2s}
 .ed-overlay.on{opacity:1;pointer-events:auto}
-.ed-bar{display:flex;align-items:center;gap:6px;padding:10px 14px;background:rgba(255,255,255,.04);border-bottom:1px solid rgba(255,255,255,.06);flex-wrap:wrap}
-.ed-bar .tit{font-size:14px;font-weight:600;color:var(--text);white-space:nowrap;margin-right:8px}
-.ed-mode.active{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
-.ed-sep{color:rgba(255,255,255,.12)}
-.ed-canvas-wrap{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:10px}
-#edCanvas{max-width:100%;max-height:100%;box-shadow:0 0 40px rgba(0,0,0,.5);cursor:crosshair}
-.ed-hint{text-align:center;padding:7px;font-size:11px;color:var(--text-secondary);background:rgba(255,255,255,.02)}
-.sharp-sel{padding:4px 6px;border-radius:7px;border:1px solid var(--glass-border);background:rgba(0,0,0,.3);color:var(--text);font-size:11px;font-family:inherit;outline:none}
-.sharp-sel:focus{border-color:var(--accent)}
+.ed-top{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:rgba(0,0,0,.8);gap:8px}
+.ed-top .tit{font-size:13px;font-weight:600;color:#fff}
+.ed-top .btns{display:flex;gap:6px}
+.ed-canvas-wrap{flex:1;overflow:hidden;display:flex;align-items:center;justify-content:center;padding:8px}
+#edCanvas{max-width:100%;max-height:100%;touch-action:none}
+.ed-bottom{background:rgba(0,0,0,.85);padding:8px 12px;padding-bottom:calc(8px + env(safe-area-inset-bottom,0px))}
+.ed-tools{display:flex;gap:8px;justify-content:center;margin-bottom:8px}
+.ed-tool-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 16px;border-radius:12px;border:none;background:rgba(255,255,255,.06);color:#888;font-size:11px;font-family:inherit;cursor:pointer;transition:all .15s;min-width:56px}
+.ed-tool-btn svg{width:22px;height:22px}
+.ed-tool-btn.active{background:var(--accent);color:#fff}
+.ed-tool-btn:active{transform:scale(.95)}
+.ed-opts{display:flex;align-items:center;gap:8px;justify-content:center;flex-wrap:wrap}
+.ed-opts.hide{display:none}
+.ed-opts input[type=range]{width:100px;accent-color:var(--accent)}
+.ed-opts label{font-size:11px;color:#aaa;white-space:nowrap}
+.ed-opts .val{font-size:11px;color:#fff;min-width:28px;text-align:center}
+.ed-opts select{padding:4px 6px;border-radius:6px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);color:#fff;font-size:11px;font-family:inherit;outline:none}
+.ed-hint{text-align:center;padding:6px;font-size:10px;color:#666}
 
-@media(max-width:500px){.ed-bar{gap:4px;padding:8px 10px}.ed-bar .btn-sm{padding:5px 9px;font-size:10px}}
+@media(max-width:500px){.ed-tool-btn{padding:6px 12px;min-width:48px;font-size:10px}.ed-opts{gap:4px}}
 </style>
 </head>
 <body>
@@ -136,27 +145,47 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
 
 <!-- 编辑模式 -->
 <div class="ed-overlay" id="edOverlay">
-  <div class="ed-bar">
-    <span class="tit">✏️ 编辑抠图</span>
-    <button class="btn btn-glass btn-sm ed-mode active" data-m="restore">🖌️ 恢复</button>
-    <button class="btn btn-glass btn-sm ed-mode" data-m="erase">🧹 擦除</button>
-    <span class="ed-sep">|</span>
-    <span style="font-size:11px;color:var(--text-secondary)">笔刷</span>
-    <input type="range" id="edBrush" min="3" max="100" value="25" style="width:70px;accent-color:var(--accent)">
-    <span style="font-size:11px;color:var(--text)" id="edBrushVal">25px</span>
-    <span class="ed-sep">|</span>
-    <span style="font-size:11px;color:var(--text-secondary)">清晰度</span>
-    <select class="sharp-sel" id="edSharp">
-      <option value="0">关</option><option value="0.5">轻</option><option value="1" selected>标准</option><option value="1.5">强</option><option value="2">最强</option>
-    </select>
-    <span class="ed-sep">|</span>
-    <button class="btn btn-glass btn-sm" id="edViewToggle" onclick="edToggleView()">🔄 查看原图</button>
-    <button class="btn btn-glass btn-sm" onclick="edUndo()">↩ 撤销</button>
-    <button class="btn btn-accent btn-sm" onclick="edSave()">💾 保存</button>
-    <button class="btn btn-glass btn-sm" onclick="edClose()">✕ 关闭</button>
+  <div class="ed-top">
+    <span class="tit">✏️ 编辑</span>
+    <div class="btns">
+      <button class="btn btn-glass btn-sm" onclick="edToggleView()" id="edViewBtn">🔄 原图</button>
+      <button class="btn btn-glass btn-sm" onclick="edUndo()">↩</button>
+      <button class="btn btn-accent btn-sm" onclick="edSave()">💾 保存</button>
+      <button class="btn btn-glass btn-sm" onclick="edClose()">✕</button>
+    </div>
   </div>
   <div class="ed-canvas-wrap"><canvas id="edCanvas"></canvas></div>
-  <div class="ed-hint" id="edHint">🖌️ 恢复：涂抹还原 ｜ 🧹 擦除：涂抹透明 ｜ 滚轮缩放 ｜ 右键平移 ｜ 🔄 切换原图/结果</div>
+  <div class="ed-hint" id="edHint">轻点选择区域 · 长按涂抹 · 双指缩放平移</div>
+  <div class="ed-bottom">
+    <div class="ed-tools" id="edTools">
+      <button class="ed-tool-btn active" data-tool="magic">
+        <span style="font-size:20px">🪄</span>智能选取
+      </button>
+      <button class="ed-tool-btn" data-tool="brush">
+        <span style="font-size:20px">🖌️</span>涂抹修复
+      </button>
+      <button class="ed-tool-btn" data-tool="remove">
+        <span style="font-size:20px">🧹</span>内容消除
+      </button>
+    </div>
+    <!-- 智能选取选项 -->
+    <div class="ed-opts" id="optMagic">
+      <label>容差</label><input type="range" id="magicTol" min="5" max="100" value="30"><span class="val" id="magicTolVal">30</span>
+      <button class="btn btn-glass btn-sm" onclick="edDeleteSelection()">🗑 删除选中</button>
+      <select id="magicMode" style="margin-left:4px"><option value="bg">选背景</option><option value="fg">选主体</option></select>
+    </div>
+    <!-- 涂抹修复选项 -->
+    <div class="ed-opts hide" id="optBrush">
+      <button class="btn btn-glass btn-sm ed-bmode active" data-bm="restore">🖌 恢复</button>
+      <button class="btn btn-glass btn-sm ed-bmode" data-bm="erase">🧹 擦除</button>
+      <label style="margin-left:4px">笔刷</label><input type="range" id="edBrush" min="3" max="100" value="25"><span class="val" id="edBrushVal">25px</span>
+    </div>
+    <!-- 内容消除选项 -->
+    <div class="ed-opts hide" id="optRemove">
+      <label>笔刷</label><input type="range" id="removeBrush" min="5" max="80" value="20"><span class="val" id="removeBrushVal">20px</span>
+      <button class="btn btn-glass btn-sm" onclick="edInpaint()">✨ 智能填充</button>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -401,61 +430,198 @@ async function downloadZip(){
 // ===== 编辑模式 =====
 const edOver=$('edOverlay'),edCvs=$('edCanvas'),edCtx=edCvs.getContext('2d');
 let edId=null,edOrig=null,edResult=null,edMaskCvs=null,edMaskCtx=null;
-let edMode='restore',edBrush=25,edPainting=false,edUndoStack=[];
-let edZoom=1,edPX=0,edPY=0,edPanning=false,edPanStart=null;
-let edShowOrig=false; // 切换查看原图
+let edTool='magic'; // magic | brush | remove
+let edBrushMode='restore',edBrush=25,edPainting=false,edUndoStack=[];
+let edZoom=1,edPX=0,edPY=0,edPanning=false,edPanStart=null,edShowOrig=false;
+let edSelMask=null; // 选区遮罩（ImageData），非null=有选区
 
-$('edBrush').addEventListener('input',function(){edBrush=+this.value;$('edBrushVal').textContent=edBrush+'px'});
-document.querySelectorAll('.ed-mode').forEach(b=>b.addEventListener('click',function(){
-  document.querySelectorAll('.ed-mode').forEach(x=>x.classList.remove('active'));
-  this.classList.add('active');edMode=this.dataset.m;
-  $('edHint').textContent=edMode==='restore'?'🖌️ 恢复模式：涂抹处还原为原图 ｜ 绿色笔刷圈':edMode==='erase'?'🧹 擦除模式：涂抹处变透明 ｜ 红色笔刷圈':'';
+// ---- 工具切换 ----
+document.querySelectorAll('.ed-tool-btn').forEach(b=>b.addEventListener('click',function(){
+  document.querySelectorAll('.ed-tool-btn').forEach(x=>x.classList.remove('active'));
+  this.classList.add('active');edTool=this.dataset.tool;
+  edSelMask=null; // 切换工具清选区
+  $('optMagic').classList.toggle('hide',edTool!=='magic');
+  $('optBrush').classList.toggle('hide',edTool!=='brush');
+  $('optRemove').classList.toggle('hide',edTool!=='remove');
+  $('edHint').textContent=edTool==='magic'?'点击要选取的区域 · 调整容差 · 点删除':edTool==='brush'?'涂抹恢复原图或擦除透明':edTool==='remove'?'涂抹要消除的内容 · 点智能填充':'';
+  renderEd();
 }));
 
-// 鼠标事件
+// ---- 涂抹模式子按钮 ----
+document.querySelectorAll('.ed-bmode').forEach(b=>b.addEventListener('click',function(){
+  document.querySelectorAll('.ed-bmode').forEach(x=>x.classList.remove('active'));
+  this.classList.add('active');edBrushMode=this.dataset.bm;
+}));
+
+// ---- 滑块 ----
+$('edBrush').addEventListener('input',function(){edBrush=+this.value;$('edBrushVal').textContent=edBrush+'px'});
+$('removeBrush').addEventListener('input',function(){$('removeBrushVal').textContent=this.value+'px'});
+$('magicTol').addEventListener('input',function(){$('magicTolVal').textContent=this.value});
+
+// ---- 画布事件 ----
 edCvs.addEventListener('mousedown',e=>{
   if(e.button===2){edPanning=true;edPanStart={x:e.clientX-edPX,y:e.clientY-edPY};return}
   if(e.button!==0)return;
-  edPainting=true;edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));
-  paintBrush(edPos(e));e.preventDefault();
+  const pos=edPos(e);
+  if(edTool==='magic'){magicWand(pos);return}
+  if(edTool==='brush'){edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));edPainting=true;paintAt(pos);}
+  if(edTool==='remove'){edPainting=true;paintAt(pos);}
+  e.preventDefault();
 });
 edCvs.addEventListener('mousemove',e=>{
   if(edPanning){edPX=e.clientX-edPanStart.x;edPY=e.clientY-edPanStart.y;renderEd();return}
-  if(edPainting)paintBrush(edPos(e));
-  renderEd(); // 刷新笔刷光标
+  if(edPainting)paintAt(edPos(e));
+  renderEd();
   e.preventDefault();
 });
 window.addEventListener('mouseup',()=>{edPainting=false;edPanning=false});
 edCvs.addEventListener('wheel',e=>{e.preventDefault();edZoom=Math.max(0.2,Math.min(5,edZoom*(e.deltaY>0?0.9:1.1)));renderEd()});
 edCvs.addEventListener('contextmenu',e=>e.preventDefault());
 
-// 触摸支持
+// 触摸
 edCvs.addEventListener('touchstart',e=>{
   if(e.touches.length===2){edPanning=true;const mx=(e.touches[0].clientX+e.touches[1].clientX)/2,my=(e.touches[0].clientY+e.touches[1].clientY)/2;edPanStart={x:mx-edPX,y:my-edPY};return}
-  if(e.touches.length===1){edPainting=true;edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));paintBrush(touchPos(e.touches[0]));e.preventDefault()}
+  if(e.touches.length===1){const pos=touchPos(e.touches[0]);if(edTool==='magic'){magicWand(pos);return}if(edTool==='brush'){edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));}edPainting=true;paintAt(pos);e.preventDefault()}
 },{passive:false});
 edCvs.addEventListener('touchmove',e=>{
   if(edPanning&&e.touches.length===2){const mx=(e.touches[0].clientX+e.touches[1].clientX)/2,my=(e.touches[0].clientY+e.touches[1].clientY)/2;edPX=mx-edPanStart.x;edPY=my-edPanStart.y;renderEd();return}
-  if(edPainting&&e.touches.length===1){paintBrush(touchPos(e.touches[0]));renderEd();e.preventDefault()}
+  if(edPainting&&e.touches.length===1){paintAt(touchPos(e.touches[0]));renderEd();e.preventDefault()}
 },{passive:false});
 edCvs.addEventListener('touchend',()=>{edPainting=false;edPanning=false});
 
 function edPos(e){const r=edCvs.getBoundingClientRect();return{x:(e.clientX-r.left-edPX)/edZoom,y:(e.clientY-r.top-edPY)/edZoom}}
 function touchPos(t){const r=edCvs.getBoundingClientRect();return{x:(t.clientX-r.left-edPX)/edZoom,y:(t.clientY-r.top-edPY)/edZoom}}
 
-function edToggleView(){edShowOrig=!edShowOrig;$('edViewToggle').textContent=edShowOrig?'🔄 查看结果':'🔄 查看原图';renderEd()}
+// ---- 魔法棒：Flood Fill 选区 ----
+function magicWand(pos){
+  const w=edCvs.width,h=edCvs.height;
+  const x=Math.round(pos.x),y=Math.round(pos.y);
+  if(x<0||y<0||x>=w||y>=h)return;
+  // 从当前显示的图像取色（结果图或原图）
+  const srcCvs=document.createElement('canvas');srcCvs.width=w;srcCvs.height=h;
+  const sctx=srcCvs.getContext('2d');
+  sctx.drawImage(edShowOrig?edOrig:edResult,0,0);
+  const src=sctx.getImageData(0,0,w,h);
+  const idx=(y*w+x)*4;
+  const sr=src.data[idx],sg=src.data[idx+1],sb=src.data[idx+2];
+  const tol=parseInt($('magicTol').value)||30;
+  const visited=new Uint8Array(w*h);
+  const sel=new Uint8Array(w*h); // 1 = selected
+  const stack=[x,y];
+  visited[y*w+x]=1;sel[y*w+x]=1;
+  const mode=$('magicMode').value; // bg=选相似色(背景), fg=选不透明区域(主体)
+
+  while(stack.length){
+    const px=stack.pop(),py=stack.pop();
+    for(const[nx,ny]of[[px-1,py],[px+1,py],[px,py-1],[px,py+1]]){
+      if(nx<0||ny<0||nx>=w||ny>=h||visited[ny*w+nx])continue;
+      visited[ny*w+nx]=1;
+      const i=(ny*w+nx)*4;
+      if(mode==='bg'){
+        const dist=Math.sqrt((src.data[i]-sr)**2+(src.data[i+1]-sg)**2+(src.data[i+2]-sb)**2);
+        if(dist<=tol){sel[ny*w+nx]=1;stack.push(nx,ny)}
+      }else{
+        if(src.data[i+3]>64){sel[ny*w+nx]=1;stack.push(nx,ny)}
+      }
+    }
+  }
+
+  // 创建选区遮罩
+  edSelMask=new Uint8ClampedArray(w*h*4);
+  for(let i=0;i<sel.length;i++){
+    const di=i*4;
+    edSelMask[di]=255;edSelMask[di+1]=0;edSelMask[di+2]=0;edSelMask[di+3]=sel[i]?100:0;
+  }
+  $('edHint').textContent=`已选中区域 · 点「删除选中」确认`;
+  renderEd();
+}
+
+// ---- 删除选区（变透明） ----
+function edDeleteSelection(){
+  if(!edSelMask||!edMaskCtx)return;
+  edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));
+  const md=edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height);
+  for(let i=0;i<edSelMask.length;i+=4){
+    if(edSelMask[i+3]>0)md.data[i]=0; // mask=0 → 透明
+  }
+  edMaskCtx.putImageData(md,0,0);
+  edSelMask=null;$('edHint').textContent='选区已删除';
+  renderEd();
+}
+
+// ---- 内容感知填充 ----
+function edInpaint(){
+  if(!edMaskCtx)return;
+  edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));
+  const w=edCvs.width,h=edCvs.height;
+  const md=edMaskCtx.getImageData(0,0,w,h);
+  // 从原图获取颜色数据
+  const oc=document.createElement('canvas');oc.width=w;oc.height=h;
+  const ox=oc.getContext('2d');ox.drawImage(edOrig,0,0);
+  const od=ox.getImageData(0,0,w,h);
+  // 对每个标记为0的像素，用周围最近的非0像素填充
+  const fillR=15; // 搜索半径
+  const copy=new Uint8ClampedArray(md.data);
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      if(copy[i]===0)continue; // 只处理被标记擦除的像素（mask=0的新擦除像素）
+      if(md.data[i]===0&&copy[i]===0)continue; // 跳过已处理的
+    }
+  }
+  // 简化：对mask=0的像素，使用周围mask=255像素的平均色
+  const result=new Uint8ClampedArray(md.data);
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      if(md.data[i]>64)continue; // 只处理透明区域
+      let r=0,g=0,b=0,c=0;
+      for(let dy=-fillR;dy<=fillR;dy++){
+        for(let dx=-fillR;dx<=fillR;dx++){
+          const nx=x+dx,ny=y+dy;
+          if(nx<0||ny<0||nx>=w||ny>=h)continue;
+          const ni=(ny*w+nx)*4;
+          if(md.data[ni]>64){r+=od.data[ni];g+=od.data[ni+1];b+=od.data[ni+2];c++}
+        }
+      }
+      if(c>0){result[i]=od.data[i];result[i+1]=od.data[i+1];result[i+2]=od.data[i+2];result[i+3]=255}
+      else{result[i]=od.data[i];result[i+1]=od.data[i+1];result[i+2]=od.data[i+2];result[i+3]=255}
+    }
+  }
+  edMaskCtx.putImageData(new ImageData(result,w,h),0,0);
+  $('edHint').textContent='智能填充完成 · 查看效果';
+  renderEd();
+}
+
+// ---- 涂抹 ----
+function paintAt(pos){
+  if(!edMaskCtx)return;
+  const r=(edTool==='remove'?parseInt($('removeBrush').value)||20:edBrush)/2;
+  edMaskCtx.beginPath();edMaskCtx.arc(pos.x,pos.y,r,0,Math.PI*2);
+  if(edTool==='remove')edMaskCtx.fillStyle='#000'; // 标记为擦除
+  else edMaskCtx.fillStyle=edBrushMode==='restore'?'#fff':'#000';
+  edMaskCtx.fill();
+  renderEd();
+}
+
+// ---- 视图 ----
+function edToggleView(){edShowOrig=!edShowOrig;$('edViewBtn').textContent=edShowOrig?'🔄 结果':'🔄 原图';renderEd()}
 
 async function edOpen(id){
   const job=jobs.get(id);if(!job?.resultBlob)return;
-  edId=id;edUndoStack=[];edZoom=1;edPX=0;edPY=0;edShowOrig=false;
-  $('edViewToggle').textContent='🔄 查看原图';
+  edId=id;edUndoStack=[];edZoom=1;edPX=0;edPY=0;edShowOrig=false;edSelMask=null;
+  $('edViewBtn').textContent='🔄 原图';
+  $('edHint').textContent='点击要选取的区域 · 调整容差 · 点删除';
   edOrig=await loadImage(job.blobUrl);
   edResult=await loadImage(job.resultUrl);
   const w=edResult.naturalWidth,h=edResult.naturalHeight;
   edMaskCvs=document.createElement('canvas');edMaskCvs.width=w;edMaskCvs.height=h;
   edMaskCtx=edMaskCvs.getContext('2d');edMaskCtx.fillStyle='#000';edMaskCtx.fillRect(0,0,w,h);
   edCvs.width=w;edCvs.height=h;
-  $('edSharp').value=job.sharpenLevel??1;
+  // 重置为智能选取模式
+  edTool='magic';document.querySelectorAll('.ed-tool-btn').forEach(x=>x.classList.remove('active'));
+  document.querySelector('[data-tool="magic"]').classList.add('active');
+  $('optMagic').classList.remove('hide');$('optBrush').classList.add('hide');$('optRemove').classList.add('hide');
   edOver.classList.add('on');renderEd();
 }
 
@@ -476,63 +642,29 @@ async function edSave(){
   }
   octx.putImageData(idata,0,0);
   let blob=await new Promise(r=>out.toBlob(r,'image/png'));
-  const lvl=parseFloat($('edSharp').value);
-  blob=await sharpenBlob(blob,lvl);job.sharpenLevel=lvl;
+  blob=await sharpenBlob(blob,job.sharpenLevel??1);
   if(job.resultUrl)URL.revokeObjectURL(job.resultUrl);
   job.resultBlob=blob;job.resultUrl=URL.createObjectURL(blob);
   $(`res-${edId}`).innerHTML=`<img src="${job.resultUrl}" alt="结果">`;
   edClose();
 }
 
-function edUndo(){if(edUndoStack.length){edMaskCtx.putImageData(edUndoStack.pop(),0,0);renderEd()}}
+function edUndo(){if(edUndoStack.length){edMaskCtx.putImageData(edUndoStack.pop(),0,0);edSelMask=null;renderEd()}}
 
 function renderEd(){
   const w=edCvs.width,h=edCvs.height;
   edCtx.clearRect(0,0,w,h);edCtx.save();edCtx.translate(edPX,edPY);edCtx.scale(edZoom,edZoom);
-
-  if(edShowOrig){
-    // 查看原图模式：直接显示原图
-    edCtx.drawImage(edOrig,0,0);
-  }else{
-    // 棋盘格底（透明标识）
-    const cs=12/edZoom;
-    for(let y=0;y<h;y+=cs)for(let x=0;x<w;x+=cs){
-      edCtx.fillStyle=((Math.floor(x/cs)+Math.floor(y/cs))%2===0)?'#e0e0e0':'#fff';
-      edCtx.fillRect(x,y,cs+1,cs+1);
-    }
-    // 抠图结果
+  if(edShowOrig){edCtx.drawImage(edOrig,0,0)}else{
+    const cs=10/edZoom;
+    for(let y=0;y<h;y+=cs)for(let x=0;x<w;x+=cs){edCtx.fillStyle=((Math.floor(x/cs)+Math.floor(y/cs))%2===0)?'#ddd':'#fff';edCtx.fillRect(x,y,cs+1,cs+1)}
     edCtx.drawImage(edResult,0,0);
-    // 遮罩：恢复区域叠加原图
-    if(edMaskCvs){
-      const od=edCtx.getImageData(0,0,w,h);
-      const md=edMaskCtx.getImageData(0,0,w,h);
-      const oc=document.createElement('canvas');oc.width=w;oc.height=h;
-      const ox=oc.getContext('2d');ox.drawImage(edOrig,0,0);
-      const origD=ox.getImageData(0,0,w,h);
-      for(let i=0;i<md.data.length;i+=4){
-        if(md.data[i]>128){od.data[i]=origD.data[i];od.data[i+1]=origD.data[i+1];od.data[i+2]=origD.data[i+2];od.data[i+3]=255}
-      }
-      edCtx.putImageData(od,0,0);
-    }
+    if(edMaskCvs){const od=edCtx.getImageData(0,0,w,h);const md=edMaskCtx.getImageData(0,0,w,h);const oc=document.createElement('canvas');oc.width=w;oc.height=h;const ox=oc.getContext('2d');ox.drawImage(edOrig,0,0);const origD=ox.getImageData(0,0,w,h);
+    for(let i=0;i<md.data.length;i+=4){if(md.data[i]>128){od.data[i]=origD.data[i];od.data[i+1]=origD.data[i+1];od.data[i+2]=origD.data[i+2];od.data[i+3]=255}}
+    edCtx.putImageData(od,0,0)}
   }
-
-  // 笔刷光标圈
-  if(!edShowOrig){
-    const r=edBrush/2;
-    edCtx.strokeStyle=edMode==='restore'?'#22c55e':'#ef4444';
-    edCtx.lineWidth=2/edZoom;edCtx.setLineDash([4/edZoom,3/edZoom]);
-    edCtx.beginPath();edCtx.arc(edCvs.width/2/edZoom,edCvs.height/2/edZoom,r,0,Math.PI*2);
-    edCtx.stroke();edCtx.setLineDash([]);
-  }
-
+  // 选区覆盖层（红色半透明）
+  if(edSelMask){const od=edCtx.getImageData(0,0,w,h);for(let i=0;i<edSelMask.length;i+=4){if(edSelMask[i+3]>0){od.data[i]=Math.min(255,od.data[i]*0.3+180);od.data[i+1]=Math.min(255,od.data[i+1]*0.3);od.data[i+2]=Math.min(255,od.data[i+2]*0.3);od.data[i+3]=255}}edCtx.putImageData(od,0,0)}
   edCtx.restore();
-}
-
-function paintBrush(pos){
-  if(!edMaskCtx)return;
-  edMaskCtx.beginPath();edMaskCtx.arc(pos.x,pos.y,edBrush/2,0,Math.PI*2);
-  edMaskCtx.fillStyle=edMode==='restore'?'#fff':'#000';edMaskCtx.fill();
-  renderEd();
 }
 
 function clearAll(){
