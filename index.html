@@ -607,7 +607,7 @@ $('removeBrush').addEventListener('input',function(){$('removeBrushVal').textCon
 
 // ---- 画布事件 ----
 edCvs.addEventListener('mousedown',e=>{
-  if(e.button===2){edPanning=true;edPanStart={x:e.clientX-edPX,y:e.clientY-edPY};return}
+  if(e.button===2){edPanning=true;edPanStart={x:canvasX(e.clientX)-edPX,y:canvasY(e.clientY)-edPY};return}
   if(e.button!==0)return;
   const pos=edPos(e);
   if(edTool==='transform'){
@@ -620,29 +620,32 @@ edCvs.addEventListener('mousedown',e=>{
   e.preventDefault();
 });
 edCvs.addEventListener('mousemove',e=>{
-  if(edPanning){edPX=e.clientX-edPanStart.x;edPY=e.clientY-edPanStart.y;renderEd();return}
+  if(edPanning){edPX=canvasX(e.clientX)-edPanStart.x;edPY=canvasY(e.clientY)-edPanStart.y;renderEd();return}
   if(edTfDrag){edTransformDrag(edPos(e));renderEd();e.preventDefault();return}
   if(edPainting)paintAt(edPos(e));
   renderEd();
   e.preventDefault();
 });
 window.addEventListener('mouseup',()=>{edPainting=false;edPanning=false;edTfDrag=null});
-edCvs.addEventListener('wheel',e=>{e.preventDefault();const r=edCvs.getBoundingClientRect();const mx=e.clientX-r.left,my=e.clientY-r.top;const ox=(mx-edPX)/edZoom,oy=(my-edPY)/edZoom;edZoom=Math.max(0.2,Math.min(5,edZoom*(e.deltaY>0?0.9:1.1)));edPX=mx-ox*edZoom;edPY=my-oy*edZoom;updateZoomUI();renderEd()});
+edCvs.addEventListener('wheel',e=>{e.preventDefault();const mx=canvasX(e.clientX),my=canvasY(e.clientY);const ox=(mx-edPX)/edZoom,oy=(my-edPY)/edZoom;edZoom=Math.max(0.2,Math.min(5,edZoom*(e.deltaY>0?0.9:1.1)));edPX=mx-ox*edZoom;edPY=my-oy*edZoom;updateZoomUI();renderEd()});
 edCvs.addEventListener('contextmenu',e=>e.preventDefault());
 
 // 触摸
 edCvs.addEventListener('touchstart',e=>{
-  if(e.touches.length===2){edPanning=true;const mx=(e.touches[0].clientX+e.touches[1].clientX)/2,my=(e.touches[0].clientY+e.touches[1].clientY)/2;edPanStart={x:mx-edPX,y:my-edPY};return}
+  if(e.touches.length===2){edPanning=true;const mx=canvasX((e.touches[0].clientX+e.touches[1].clientX)/2),my=canvasY((e.touches[0].clientY+e.touches[1].clientY)/2);edPanStart={x:mx-edPX,y:my-edPY};return}
   if(e.touches.length===1){const pos=touchPos(e.touches[0]);if(edTool==='brush'){edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));}edPainting=true;paintAt(pos);e.preventDefault()}
 },{passive:false});
 edCvs.addEventListener('touchmove',e=>{
-  if(edPanning&&e.touches.length===2){const mx=(e.touches[0].clientX+e.touches[1].clientX)/2,my=(e.touches[0].clientY+e.touches[1].clientY)/2;edPX=mx-edPanStart.x;edPY=my-edPanStart.y;renderEd();return}
+  if(edPanning&&e.touches.length===2){const mx=canvasX((e.touches[0].clientX+e.touches[1].clientX)/2),my=canvasY((e.touches[0].clientY+e.touches[1].clientY)/2);edPX=mx-edPanStart.x;edPY=my-edPanStart.y;renderEd();return}
   if(edPainting&&e.touches.length===1){paintAt(touchPos(e.touches[0]));renderEd();e.preventDefault()}
 },{passive:false});
 edCvs.addEventListener('touchend',()=>{edPainting=false;edPanning=false});
 
-function edPos(e){const r=edCvs.getBoundingClientRect();const sx=edCvs.width/r.width,sy=edCvs.height/r.height;return{x:(e.clientX-r.left)*sx/edZoom-edPX/edZoom*sx,y:(e.clientY-r.top)*sy/edZoom-edPY/edZoom*sy}}
-function touchPos(t){const r=edCvs.getBoundingClientRect();const sx=edCvs.width/r.width,sy=edCvs.height/r.height;return{x:(t.clientX-r.left)*sx/edZoom-edPX/edZoom*sx,y:(t.clientY-r.top)*sy/edZoom-edPY/edZoom*sy}}
+// 统一坐标换算：屏幕像素 → Canvas 内部像素 → 图片像素（考虑 pan/zoom）
+function canvasX(clientX){const r=edCvs.getBoundingClientRect();return(clientX-r.left)*(edCvs.width/r.width)}
+function canvasY(clientY){const r=edCvs.getBoundingClientRect();return(clientY-r.top)*(edCvs.height/r.height)}
+function edPos(e){return{x:(canvasX(e.clientX)-edPX)/edZoom,y:(canvasY(e.clientY)-edPY)/edZoom}}
+function touchPos(t){return{x:(canvasX(t.clientX)-edPX)/edZoom,y:(canvasY(t.clientY)-edPY)/edZoom}};
 
 // ---- 魔法棒：Flood Fill 选区 ----
 function magicWand(pos){
@@ -919,14 +922,16 @@ function edTransformFlipV(){edTf.sy*=-1;renderEd()}
 // ---- 视图 ----
 function edToggleView(){edShowOrig=!edShowOrig;$('edViewBtn').textContent=edShowOrig?'🔄 结果':'🔄 原图';renderEd()}
 function edZoomIn(){
-  const r=edCvs.getBoundingClientRect(),cx=r.width/2,cy=r.height/2;
+  const r=edCvs.getBoundingClientRect();
+  const cx=(r.width/2)*(edCvs.width/r.width),cy=(r.height/2)*(edCvs.height/r.height);
   const ox=(cx-edPX)/edZoom,oy=(cy-edPY)/edZoom;
   edZoom=Math.min(5,edZoom*1.3);
   edPX=cx-ox*edZoom;edPY=cy-oy*edZoom;
   updateZoomUI();renderEd();
 }
 function edZoomOut(){
-  const r=edCvs.getBoundingClientRect(),cx=r.width/2,cy=r.height/2;
+  const r=edCvs.getBoundingClientRect();
+  const cx=(r.width/2)*(edCvs.width/r.width),cy=(r.height/2)*(edCvs.height/r.height);
   const ox=(cx-edPX)/edZoom,oy=(cy-edPY)/edZoom;
   edZoom=Math.max(0.2,edZoom/1.3);
   edPX=cx-ox*edZoom;edPY=cy-oy*edZoom;
@@ -946,12 +951,11 @@ function getSubjectBounds(){
 function edZoomFit(){
   const box=getSubjectBounds();
   const r=edCvs.getBoundingClientRect();
-  // 以主体为中心，放大到主体刚好填满屏幕
-  const s=Math.min((r.width-60)/box.w,(r.height-60)/box.h);
+  const cw=r.width*(edCvs.width/r.width),ch=r.height*(edCvs.height/r.height);
+  const s=Math.min((cw-60)/box.w,(ch-60)/box.h);
   edZoom=Math.max(0.3,Math.min(5,s));
-  // 平移使主体居中
-  edPX=(r.width-box.w*edZoom)/2-box.x*edZoom;
-  edPY=(r.height-box.h*edZoom)/2-box.y*edZoom;
+  edPX=(cw-box.w*edZoom)/2-box.x*edZoom;
+  edPY=(ch-box.h*edZoom)/2-box.y*edZoom;
   updateZoomUI();renderEd();
 }
 function updateZoomUI(){$('edZoomVal').textContent=Math.round(edZoom*100)+'%'}
