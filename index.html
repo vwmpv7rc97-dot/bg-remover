@@ -143,7 +143,10 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
   </div>
 
   <div class="toolbar">
-    <div class="status"><span class="dot" id="dot"></span><span id="statusMsg">就绪</span><br><span id="cdnStatus" style="font-size:10px;color:var(--text-secondary)"></span></div>
+    <div class="status">
+      <div><span class="dot" id="dot"></span><span id="statusMsg">就绪</span></div>
+      <div id="cdnStatus" style="font-size:10px;color:var(--accent);margin-top:2px"></div>
+    </div>
     <div class="actions" style="display:flex;gap:8px">
       <button class="btn btn-accent" id="btnZip" disabled>📦 下载 ZIP</button>
       <button class="btn btn-danger" id="btnClear" disabled>🗑 清空</button>
@@ -261,10 +264,10 @@ const AI_CDNS=[
 
 async function tryLoadUrl(url){
   // 方式1：直接 import
-  try{const m=await Promise.race([import(url),new Promise((_,r)=>setTimeout(()=>r(new Error()),6000))]);if(m.removeBackground)return m}catch(e){}
+  try{const m=await Promise.race([import(url),new Promise((_,r)=>setTimeout(()=>r(new Error()),4000))]);if(m.removeBackground)return m}catch(e){}
   // 方式2：fetch 源码 → Blob URL → import
   try{
-    const r=await Promise.race([fetch(url,{mode:'cors'}),new Promise((_,rj)=>setTimeout(()=>rj(new Error()),6000))]);
+    const r=await Promise.race([fetch(url,{mode:'cors'}),new Promise((_,rj)=>setTimeout(()=>rj(new Error()),4000))]);
     if(r.ok){const src=await r.text();const bu=URL.createObjectURL(new Blob([src],{type:'application/javascript'}));const m=await import(bu);URL.revokeObjectURL(bu);if(m.removeBackground)return m}
   }catch(e){}
   return null;
@@ -283,6 +286,8 @@ async function tryLoadUrl(url){
     $('cdnStatus').textContent=msg;
   }
   refreshCDNStatus();
+  // 让出主线程给 DOM 渲染
+  await new Promise(r=>setTimeout(r,50));
 
   const results=[];
   for(let i=0;i<AI_CDNS.length;i++){
