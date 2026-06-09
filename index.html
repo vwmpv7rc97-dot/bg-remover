@@ -1066,23 +1066,20 @@ function edMoveReset(){edMoveX=0;edMoveY=0;edMoveScale=1;$('edScaleVal').textCon
 let edRegions=[]; // 多区域数据 [{mask,color,bounds}]
 let edRegionMode=false;
 
-function edRegionSelect(){
+async function autoDetectRegions(){
   if(!edResult)return;
-  if(edRegionMode){edRegionMode=false;edRegions=[];$('edHint').textContent='区域选择已退出';renderEd();return}
-
-  // 检测连通区域
   const w=edResult.naturalWidth,h=edResult.naturalHeight;
   const tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;
   const ttx=tmp.getContext('2d');ttx.drawImage(edResult,0,0);
   const d=ttx.getImageData(0,0,w,h).data;
   const visited=new Uint8Array(w*h);
-  const colors=['#ef4444','#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899'];
+  const colors=['#ef4444','#3b82f6','#10b981','#f59e0b','#8b5cf6','#ec4899','#14b8a6','#f97316'];
   edRegions=[];
 
+  // BFS 找所有连通区域
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){
     const idx=y*w+x;
     if(d[idx*4+3]>32&&!visited[idx]){
-      // BFS 找连通区域
       const region=[];const stack=[[x,y]];visited[idx]=1;
       let minX=x,maxX=x,minY=y,maxY=y;
       while(stack.length){
@@ -1094,18 +1091,25 @@ function edRegionSelect(){
           if(d[ni*4+3]>32&&!visited[ni]){visited[ni]=1;stack.push([nx,ny])}
         }
       }
-      if(region.length>50){ // 忽略太小的噪点
+      if(region.length>80){ // 忽略噪点
         edRegions.push({pixels:region,color:colors[edRegions.length%colors.length],bounds:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1},removed:false});
       }
     }
   }
 
-  if(edRegions.length<2){edRegions=[];alert('只检测到1个主体区域，无需多选');return}
-  edRegionMode=true;
-  $('edHint').textContent=`检测到 ${edRegions.length} 个区域 · 点击区域切换保留/删除 · 再点🧩退出`;
-  // 绑定点击事件处理
-  edCvs.style.cursor='pointer';
-  renderEd();
+  if(edRegions.length>=2){
+    edRegionMode=true;
+    $('edHint').textContent=`👆 检测到 ${edRegions.length} 个主体 · 点击彩色区域切换保留/删除 · 模式切换退出`;
+    renderEd();
+  }
+}
+
+// 手动触发区域选择（工具按钮调用）
+function edRegionSelect(){
+  if(!edResult)return;
+  if(edRegionMode){edRegionMode=false;edRegions=[];$('edHint').textContent='区域选择已退出';renderEd();return}
+  autoDetectRegions();
+}
 }
 
 function toggleRegionAt(pos){
@@ -1162,7 +1166,7 @@ async function edOpen(id){
   document.querySelector('[data-tool="move"]').classList.add('active');
   $('optMove').classList.remove('hide');$('optBrush').classList.add('hide');$('optRemove').classList.add('hide');
   $('edSharp').value=job.sharpenLevel??1;
-  edSharpBase=null; // 重置对比基准
+  edSharpBase=null; edRegions=[];edRegionMode=false;autoDetectRegions(); // 自动检测多区域
   edOver.classList.add('on');edZoomFit();updateZoomUI();renderEd();
 }
 
