@@ -150,12 +150,13 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
       <option value="0">关</option><option value="0.5">轻</option><option value="1" selected>标准</option><option value="1.5">强</option><option value="2">最强</option>
     </select>
     <span class="ed-sep">|</span>
+    <button class="btn btn-glass btn-sm" id="edViewToggle" onclick="edToggleView()">🔄 查看原图</button>
     <button class="btn btn-glass btn-sm" onclick="edUndo()">↩ 撤销</button>
     <button class="btn btn-accent btn-sm" onclick="edSave()">💾 保存</button>
     <button class="btn btn-glass btn-sm" onclick="edClose()">✕ 关闭</button>
   </div>
   <div class="ed-canvas-wrap"><canvas id="edCanvas"></canvas></div>
-  <div class="ed-hint" id="edHint">🖌️ 恢复模式：涂抹处恢复为原图 ｜ 滚轮缩放 ｜ 右键拖拽平移</div>
+  <div class="ed-hint" id="edHint">🖌️ 恢复：涂抹还原 ｜ 🧹 擦除：涂抹透明 ｜ 滚轮缩放 ｜ 右键平移 ｜ 🔄 切换原图/结果</div>
 </div>
 
 <script>
@@ -402,34 +403,52 @@ const edOver=$('edOverlay'),edCvs=$('edCanvas'),edCtx=edCvs.getContext('2d');
 let edId=null,edOrig=null,edResult=null,edMaskCvs=null,edMaskCtx=null;
 let edMode='restore',edBrush=25,edPainting=false,edUndoStack=[];
 let edZoom=1,edPX=0,edPY=0,edPanning=false,edPanStart=null;
+let edShowOrig=false; // 切换查看原图
 
 $('edBrush').addEventListener('input',function(){edBrush=+this.value;$('edBrushVal').textContent=edBrush+'px'});
 document.querySelectorAll('.ed-mode').forEach(b=>b.addEventListener('click',function(){
   document.querySelectorAll('.ed-mode').forEach(x=>x.classList.remove('active'));
   this.classList.add('active');edMode=this.dataset.m;
-  $('edHint').textContent=edMode==='restore'?'🖌️ 恢复：涂抹处恢复为原图':edMode==='erase'?'🧹 擦除：涂抹处变透明':'';
+  $('edHint').textContent=edMode==='restore'?'🖌️ 恢复模式：涂抹处还原为原图 ｜ 绿色笔刷圈':edMode==='erase'?'🧹 擦除模式：涂抹处变透明 ｜ 红色笔刷圈':'';
 }));
+
+// 鼠标事件
 edCvs.addEventListener('mousedown',e=>{
   if(e.button===2){edPanning=true;edPanStart={x:e.clientX-edPX,y:e.clientY-edPY};return}
   if(e.button!==0)return;
   edPainting=true;edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));
-  paintBrush(edPos(e));
-  e.preventDefault();
+  paintBrush(edPos(e));e.preventDefault();
 });
 edCvs.addEventListener('mousemove',e=>{
   if(edPanning){edPX=e.clientX-edPanStart.x;edPY=e.clientY-edPanStart.y;renderEd();return}
   if(edPainting)paintBrush(edPos(e));
+  renderEd(); // 刷新笔刷光标
   e.preventDefault();
 });
 window.addEventListener('mouseup',()=>{edPainting=false;edPanning=false});
 edCvs.addEventListener('wheel',e=>{e.preventDefault();edZoom=Math.max(0.2,Math.min(5,edZoom*(e.deltaY>0?0.9:1.1)));renderEd()});
 edCvs.addEventListener('contextmenu',e=>e.preventDefault());
 
+// 触摸支持
+edCvs.addEventListener('touchstart',e=>{
+  if(e.touches.length===2){edPanning=true;const mx=(e.touches[0].clientX+e.touches[1].clientX)/2,my=(e.touches[0].clientY+e.touches[1].clientY)/2;edPanStart={x:mx-edPX,y:my-edPY};return}
+  if(e.touches.length===1){edPainting=true;edUndoStack.push(edMaskCtx.getImageData(0,0,edMaskCvs.width,edMaskCvs.height));paintBrush(touchPos(e.touches[0]));e.preventDefault()}
+},{passive:false});
+edCvs.addEventListener('touchmove',e=>{
+  if(edPanning&&e.touches.length===2){const mx=(e.touches[0].clientX+e.touches[1].clientX)/2,my=(e.touches[0].clientY+e.touches[1].clientY)/2;edPX=mx-edPanStart.x;edPY=my-edPanStart.y;renderEd();return}
+  if(edPainting&&e.touches.length===1){paintBrush(touchPos(e.touches[0]));renderEd();e.preventDefault()}
+},{passive:false});
+edCvs.addEventListener('touchend',()=>{edPainting=false;edPanning=false});
+
 function edPos(e){const r=edCvs.getBoundingClientRect();return{x:(e.clientX-r.left-edPX)/edZoom,y:(e.clientY-r.top-edPY)/edZoom}}
+function touchPos(t){const r=edCvs.getBoundingClientRect();return{x:(t.clientX-r.left-edPX)/edZoom,y:(t.clientY-r.top-edPY)/edZoom}}
+
+function edToggleView(){edShowOrig=!edShowOrig;$('edViewToggle').textContent=edShowOrig?'🔄 查看结果':'🔄 查看原图';renderEd()}
 
 async function edOpen(id){
   const job=jobs.get(id);if(!job?.resultBlob)return;
-  edId=id;edUndoStack=[];edZoom=1;edPX=0;edPY=0;
+  edId=id;edUndoStack=[];edZoom=1;edPX=0;edPY=0;edShowOrig=false;
+  $('edViewToggle').textContent='🔄 查看原图';
   edOrig=await loadImage(job.blobUrl);
   edResult=await loadImage(job.resultUrl);
   const w=edResult.naturalWidth,h=edResult.naturalHeight;
@@ -470,22 +489,42 @@ function edUndo(){if(edUndoStack.length){edMaskCtx.putImageData(edUndoStack.pop(
 function renderEd(){
   const w=edCvs.width,h=edCvs.height;
   edCtx.clearRect(0,0,w,h);edCtx.save();edCtx.translate(edPX,edPY);edCtx.scale(edZoom,edZoom);
-  // 底层原图
-  edCtx.drawImage(edOrig,0,0);
-  // 淡蓝色蒙版覆盖被抠掉的区域
-  const tmp=document.createElement('canvas');tmp.width=w;tmp.height=h;
-  const tctx=tmp.getContext('2d');tctx.drawImage(edResult,0,0);
-  const od=edCtx.getImageData(0,0,w,h);
-  const ad=tctx.getImageData(0,0,w,h);
-  let md=null;if(edMaskCvs)md=edMaskCtx.getImageData(0,0,w,h);
-  for(let i=0;i<od.data.length;i+=4){
-    const hasResult=ad.data[i+3]>64;
-    const restored=md&&md.data[i]>128;
-    if(restored||hasResult){} // 保留区域 → 保持原色
-    else{od.data[i]=Math.min(255,od.data[i]*0.3+91);od.data[i+1]=Math.min(255,od.data[i+1]*0.3+156);od.data[i+2]=Math.min(255,od.data[i+2]*0.3+245);od.data[i+3]=255}
+
+  if(edShowOrig){
+    // 查看原图模式：直接显示原图
+    edCtx.drawImage(edOrig,0,0);
+  }else{
+    // 棋盘格底（透明标识）
+    const cs=12/edZoom;
+    for(let y=0;y<h;y+=cs)for(let x=0;x<w;x+=cs){
+      edCtx.fillStyle=((Math.floor(x/cs)+Math.floor(y/cs))%2===0)?'#e0e0e0':'#fff';
+      edCtx.fillRect(x,y,cs+1,cs+1);
+    }
+    // 抠图结果
+    edCtx.drawImage(edResult,0,0);
+    // 遮罩：恢复区域叠加原图
+    if(edMaskCvs){
+      const od=edCtx.getImageData(0,0,w,h);
+      const md=edMaskCtx.getImageData(0,0,w,h);
+      const oc=document.createElement('canvas');oc.width=w;oc.height=h;
+      const ox=oc.getContext('2d');ox.drawImage(edOrig,0,0);
+      const origD=ox.getImageData(0,0,w,h);
+      for(let i=0;i<md.data.length;i+=4){
+        if(md.data[i]>128){od.data[i]=origD.data[i];od.data[i+1]=origD.data[i+1];od.data[i+2]=origD.data[i+2];od.data[i+3]=255}
+      }
+      edCtx.putImageData(od,0,0);
+    }
   }
-  edCtx.putImageData(od,0,0);
-  edCtx.globalAlpha=0.12;edCtx.drawImage(edResult,0,0);edCtx.globalAlpha=1;
+
+  // 笔刷光标圈
+  if(!edShowOrig){
+    const r=edBrush/2;
+    edCtx.strokeStyle=edMode==='restore'?'#22c55e':'#ef4444';
+    edCtx.lineWidth=2/edZoom;edCtx.setLineDash([4/edZoom,3/edZoom]);
+    edCtx.beginPath();edCtx.arc(edCvs.width/2/edZoom,edCvs.height/2/edZoom,r,0,Math.PI*2);
+    edCtx.stroke();edCtx.setLineDash([]);
+  }
+
   edCtx.restore();
 }
 
