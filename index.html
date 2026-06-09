@@ -195,6 +195,7 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
     <div class="ed-opts hide" id="optRemove">
       <label>笔刷</label><input type="range" id="removeBrush" min="5" max="80" value="20"><span class="val" id="removeBrushVal">20px</span>
       <button class="btn btn-glass btn-sm" onclick="edInpaint()">✨ 智能填充</button>
+      <button class="btn btn-accent btn-sm" id="btnAiRemove" onclick="edAiInpaint()">🤖 AI 消除</button>
     </div>
   </div>
 </div>
@@ -725,6 +726,84 @@ function edInpaint(){
   }
   edMaskCtx.putImageData(new ImageData(result,w,h),0,0);
   $('edHint').textContent='智能填充完成 · 查看效果';
+  renderEd();
+}
+
+// AI 消除（HuggingFace Inpainting）
+async function edAiInpaint(){
+  const token=$('aiToken').value.trim();
+  if(!token){alert('请先在页面顶部粘贴 AI Token');return}
+  if(!edMaskCtx||!edOrig)return;
+
+  const w=edCvs.width,h=edCvs.height;
+  // 生成 mask 图（涂抹区域=白色=要消除）
+  const maskCvs=document.createElement('canvas');maskCvs.width=w;maskCvs.height=h;
+  const maskCtx2=maskCvs.getContext('2d');
+  maskCtx2.fillStyle='#000';maskCtx2.fillRect(0,0,w,h);
+  const md=edMaskCtx.getImageData(0,0,w,h);
+  const maskData=maskCtx2.getImageData(0,0,w,h);
+  let hasMark=0;
+  for(let i=0;i<md.data.length;i+=4){
+    if(md.data[i]<64){maskData.data[i]=maskData.data[i+1]=maskData.data[i+2]=255;maskData.data[i+3]=255;hasMark++}
+  }
+  if(!hasMark){alert('请先涂抹要消除的区域');return}
+  maskCtx2.putImageData(maskData,0,0);
+
+  // 原图
+  const origCvs=document.createElement('canvas');origCvs.width=w;origCvs.height=h;
+  origCvs.getContext('2d').drawImage(edOrig,0,0);
+
+  const maskBlob=await new Promise(r=>maskCvs.toBlob(r,'image/png'));
+  const origBlob=await new Promise(r=>origCvs.toBlob(r,'image/png'));
+
+  $('edHint').textContent='🤖 AI 消除中（约10-30秒）…';
+  $('btnAiRemove').disabled=true;
+
+  try{
+    // 调用 HF Inpainting API
+    const form=new FormData();
+    form.append('image',origBlob,'image.png');
+    form.append('mask',maskBlob,'mask.png');
+
+    const ar=await fetch('https://api-inference.huggingface.co/models/runwayml/stable-diffusion-inpainting',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+token},
+      body:form,
+    });
+
+    if(!ar.ok){const e=await ar.text();throw new Error(`${ar.status}: ${e.slice(0,150)}`)}
+
+    const resultBlob=await ar.blob();
+    if(resultBlob.type.includes('json')){const j=JSON.parse(await resultBlob.text());throw new Error(j.error||'模型加载中，请重试')}
+
+    // 替换结果
+    const resultUrl=URL.createObjectURL(resultBlob);
+    const newImg=await loadImage(resultUrl);
+
+    // 更新 edResult 和 mask
+    edOrig=newImg; // 更新原图为 AI 结果
+    const job=jobs.get(edId);
+    if(job){
+      // 清理旧 URL，更新 result
+      const outCvs=document.createElement('canvas');outCvs.width=w;outCvs.height=h;
+      outCvs.getContext('2d').drawImage(newImg,0,0);
+      const newBlob=await new Promise(r=>outCvs.toBlob(r,'image/png'));
+      if(job.resultUrl)URL.revokeObjectURL(job.resultUrl);
+      job.resultBlob=newBlob;job.resultUrl=URL.createObjectURL(newBlob);
+      job.aiMask=null;
+      edResult=newImg;
+    }
+
+    // 重置 mask
+    edMaskCtx.fillStyle='#000';edMaskCtx.fillRect(0,0,w,h);
+    edUndoStack=[];
+
+    $('edHint').textContent='✅ AI 消除完成 · 可继续编辑或保存';
+  }catch(e){
+    $('edHint').textContent='❌ AI 消除失败: '+e.message;
+    console.error(e);
+  }
+  $('btnAiRemove').disabled=false;
   renderEd();
 }
 
