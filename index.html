@@ -272,10 +272,26 @@ async function tryLoadUrl(url){
 }
 
 (async function loadLocalAI(){
-  $('statusMsg').textContent='尝试加载本地 AI 引擎…';
-  const results=await Promise.allSettled(AI_CDNS.map(u=>tryLoadUrl(u)));
-  const winner=results.find(r=>r.status==='fulfilled'&&r.value);
-  if(winner){localAiFn=winner.value.removeBackground;$('statusMsg').textContent='AI 引擎就绪 · 优先本地处理'};
+  const names=['esm.sh','npmmirror(阿里)','jsdelivr','fastly','unpkg','esm.run','jspm'];
+  const statuses=names.map(n=>({name:n,state:'等待'}));
+  function updateUI(){
+    const done=statuses.filter(s=>s.state!=='等待').length;
+    const ok=statuses.filter(s=>s.state==='✅').length;
+    if(ok>0)$('statusMsg').textContent=`AI 引擎就绪 (${ok}个CDN通) · 优先本地处理`;
+    else if(done===statuses.length)$('statusMsg').textContent='7个CDN全不通 · 可用云端API或Canvas引擎';
+    else $('statusMsg').textContent=`尝试加载 AI 引擎…(${done}/7)`;
+  }
+  updateUI();
+
+  const results=[];
+  for(let i=0;i<AI_CDNS.length;i++){
+    statuses[i].state='加载中';updateUI();
+    const m=await tryLoadUrl(AI_CDNS[i]);
+    statuses[i].state=m?'✅':'❌';results.push(m);updateUI();
+  }
+
+  const winner=results.find(r=>r);
+  if(winner){localAiFn=winner.removeBackground}
 })();
 
 // ===== AI 抠图（魔搭 / HuggingFace 双 provider） =====
