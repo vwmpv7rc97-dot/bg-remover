@@ -184,6 +184,14 @@
   .editor-canvas-wrap.panning{cursor:grab}
   .editor-canvas-wrap.panning:active{cursor:grabbing}
   #editorCanvas{max-width:100%;max-height:100%;box-shadow:0 0 40px rgba(0,0,0,.5)}
+  .btn-ai{font-size:14px!important;padding:10px 22px!important;font-weight:700!important;letter-spacing:.06em!important}
+  .ai-progress{font-size:12px;color:var(--warning);letter-spacing:.03em;animation:pulse-dot 1s ease-in-out infinite}
+  .sharpen-select{
+    padding:5px 8px;border-radius:8px;border:1px solid var(--glass-border);
+    background:rgba(0,0,0,.3);color:var(--text);font-size:12px;font-family:inherit;
+    outline:none;-webkit-appearance:none;appearance:none;cursor:pointer
+  }
+  .sharpen-select:focus{border-color:var(--accent)}
   .editor-hint{text-align:center;padding:8px;font-size:11px;color:var(--text-secondary);letter-spacing:.03em;background:rgba(255,255,255,.02)}
 
   @media(max-width:500px){
@@ -284,7 +292,17 @@
       <input type="range" id="brushSize" min="5" max="120" value="30" class="brush-slider">
       <span id="brushSizeLabel">30px</span>
       <span class="ed-sep">|</span>
-      <button class="btn btn-accent btn-sm" id="btnAiRetry" style="display:none">🤖 AI重试</button>
+      <span class="ed-label">清晰度</span>
+      <select id="sharpenLevel" class="sharpen-select">
+        <option value="0">关闭</option>
+        <option value="0.5">轻度</option>
+        <option value="1" selected>标准</option>
+        <option value="1.5">增强</option>
+        <option value="2">最强</option>
+      </select>
+      <span class="ed-sep">|</span>
+      <button class="btn btn-accent btn-ai" id="btnAiRetry" style="display:none">🤖 AI 智能识别</button>
+      <span class="ai-progress" id="aiProgress" style="display:none">处理中…</span>
       <button class="btn btn-glass btn-sm" onclick="window._editorUndo()">↩ 撤销</button>
       <button class="btn btn-accent btn-sm" onclick="window._editorSave()">💾 保存</button>
       <button class="btn btn-glass btn-sm" onclick="window._editorClose()">✕ 关闭</button>
@@ -450,7 +468,7 @@ async function handleFiles(fileList) {
   for (const file of imageFiles) {
     const id = ++jobCounter;
     const blobUrl = URL.createObjectURL(file);
-    jobs.set(id, { file, blobUrl, status:'pending', error:null, resultBlob:null, resultUrl:null });
+    jobs.set(id, { file, blobUrl, status:'pending', error:null, resultBlob:null, resultUrl:null, sharpenLevel:1 });
     createCard(id, file.name, blobUrl);
     processImage(id);
   }
@@ -526,9 +544,15 @@ async function processImage(id) {
     const th = parseInt($('outH').value) || 0;
     if (tw > 0 || th > 0) {
       statusEl.textContent = `调整尺寸至 ${tw||'auto'}×${th||'auto'}…`;
-      progressBar.style.width = '85%';
+      progressBar.style.width = '80%';
       resultBlob = await resizeCanvas(resultBlob, tw, th);
     }
+
+    // 默认清晰化
+    statusEl.textContent = '清晰化处理…';
+    progressBar.style.width = '90%';
+    resultBlob = await sharpenBlob(resultBlob, job.sharpenLevel ?? 1);
+    job.sharpenLevel = job.sharpenLevel ?? 1;
 
     const resultUrl = URL.createObjectURL(resultBlob);
     job.resultBlob = resultBlob;
@@ -595,6 +619,47 @@ async function resizeCanvas(blob, tw, th) {
   ctx.drawImage(img, sx, sy, sw, sh);
 
   return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+}
+
+// 清晰化处理（卷积锐化）
+async function sharpenBlob(blob, strength) {
+  if (strength <= 0) return blob;
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image(); i.onload = () => resolve(i); i.onerror = reject;
+    i.src = URL.createObjectURL(blob);
+  });
+  const cvs = document.createElement('canvas');
+  cvs.width = img.naturalWidth; cvs.height = img.naturalHeight;
+  const ctx = cvs.getContext('2d');
+  ctx.drawImage(img, 0, 0);
+  const w = cvs.width, h = cvs.height;
+  const src = ctx.getImageData(0, 0, w, h);
+  const dst = ctx.createImageData(w, h);
+  const s = strength; // 0.5~2
+  const k = [0,-s/4,0, -s/4,1+s,-s/4, 0,-s/4,0]; // 3x3 sharpen kernel
+  const kw = 3, kh = 3, kcx = 1, kcy = 1;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      let r=0,g=0,b=0,a=0;
+      for (let ky=0;ky<kh;ky++) {
+        for (let kx=0;kx<kw;kx++) {
+          const sx2 = Math.min(w-1,Math.max(0,x+kx-kcx));
+          const sy2 = Math.min(h-1,Math.max(0,y+ky-kcy));
+          const idx = (sy2*w+sx2)*4;
+          const kv = k[ky*kw+kx];
+          r+=src.data[idx]*kv; g+=src.data[idx+1]*kv;
+          b+=src.data[idx+2]*kv; a+=src.data[idx+3]*kv;
+        }
+      }
+      const di=(y*w+x)*4;
+      dst.data[di]=Math.min(255,Math.max(0,r));
+      dst.data[di+1]=Math.min(255,Math.max(0,g));
+      dst.data[di+2]=Math.min(255,Math.max(0,b));
+      dst.data[di+3]=Math.min(255,Math.max(0,a));
+    }
+  }
+  ctx.putImageData(dst,0,0);
+  return new Promise(r=>cvs.toBlob(r,'image/png'));
 }
 
 function updateStatus() {
@@ -695,6 +760,23 @@ document.querySelectorAll('.ed-mode').forEach(b => {
   });
 });
 $('btnAiRetry').addEventListener('click', () => aiRetryLasso());
+$('sharpenLevel').addEventListener('change', async function() {
+  if (!editJobId) return;
+  const job = jobs.get(editJobId);
+  const level = parseFloat(this.value);
+  job.sharpenLevel = level;
+  editorHint.textContent = '⏳ 重新清晰化处理…';
+  const newBlob = await sharpenBlob(job.resultBlob, level);
+  if (job.resultUrl) URL.revokeObjectURL(job.resultUrl);
+  job.resultBlob = newBlob;
+  job.resultUrl = URL.createObjectURL(newBlob);
+  editResultImg = await new Promise((resolve, reject) => {
+    const i = new Image(); i.onload = () => resolve(i); i.onerror = reject;
+    i.src = job.resultUrl;
+  });
+  renderEditor();
+  editorHint.textContent = '✅ 清晰度已更新';
+});
 
 // 画布事件
 editorCanvas.addEventListener('mousedown', e => { editorMouseDown(e); e.preventDefault(); });
@@ -715,6 +797,8 @@ window._editOpen = async function(id) {
   editUndoStack = [];
   editZoom = 1; editPanX = 0; editPanY = 0;
   editLassoPts = []; editLassoActive = false;
+  // 同步清晰度设置
+  $('sharpenLevel').value = job.sharpenLevel ?? 1;
 
   // 加载原图和结果
   const loadImg = src => new Promise((resolve, reject) => {
@@ -762,7 +846,11 @@ window._editorSave = async function() {
     }
   }
   octx.putImageData(idata, 0, 0);
-  const newBlob = await new Promise(r => out.toBlob(r, 'image/png'));
+  let newBlob = await new Promise(r => out.toBlob(r, 'image/png'));
+  // 应用当前清晰度设置
+  const level = parseFloat($('sharpenLevel').value);
+  newBlob = await sharpenBlob(newBlob, level);
+  job.sharpenLevel = level;
   if (job.resultUrl) URL.revokeObjectURL(job.resultUrl);
   job.resultBlob = newBlob;
   job.resultUrl = URL.createObjectURL(newBlob);
@@ -784,35 +872,47 @@ function renderEditor() {
   ctx.save();
   ctx.translate(editPanX, editPanY);
   ctx.scale(editZoom, editZoom);
-  // 棋盘格
-  const cs = 10;
-  for (let y = 0; y < h; y += cs) {
-    for (let x = 0; x < w; x += cs) {
-      ctx.fillStyle = ((x/cs + y/cs) % 2 === 0) ? '#ccc' : '#fff';
-      ctx.fillRect(x, y, cs, cs);
+
+  // 底层：原图
+  ctx.drawImage(editOrigImg, 0, 0);
+
+  // 中层：淡蓝色覆盖被抠掉的区域
+  // 创建一个临时 canvas 来获取结果图的 alpha
+  const tmpCvs = document.createElement('canvas'); tmpCvs.width = w; tmpCvs.height = h;
+  const tmpCtx = tmpCvs.getContext('2d');
+  tmpCtx.drawImage(editResultImg, 0, 0);
+
+  const origData = ctx.getImageData(0, 0, w, h);
+  const alphaData = tmpCtx.getImageData(0, 0, w, h);
+
+  // 遮罩数据
+  let maskData = null;
+  if (editMaskCvs) maskData = editMaskCtx.getImageData(0, 0, w, h);
+
+  for (let i = 0; i < origData.data.length; i += 4) {
+    const hasResult = alphaData.data[i + 3] > 64; // 结果图不透明=保留区域
+    let restored = false;
+    if (maskData && maskData.data[i] > 128) restored = true; // 笔刷恢复
+
+    if (restored || hasResult) {
+      // 保留区域：保持原图色彩（已画在底层）
+      // 不做任何事，原图已经在底层
+    } else {
+      // 移除区域：淡蓝色蒙版
+      origData.data[i] = Math.min(255, origData.data[i] * 0.3 + 91);
+      origData.data[i+1] = Math.min(255, origData.data[i+1] * 0.3 + 156);
+      origData.data[i+2] = Math.min(255, origData.data[i+2] * 0.3 + 245);
+      origData.data[i+3] = 255;
     }
   }
-  // 结果图
+  ctx.putImageData(origData, 0, 0);
+
+  // 上层：半透明绘制结果图（保留区域有原色）
+  ctx.globalAlpha = 0.15;
   ctx.drawImage(editResultImg, 0, 0);
-  // 遮罩层（恢复区域叠加原图）
-  if (editMaskCvs) {
-    const idata = ctx.getImageData(0, 0, w, h);
-    const mdata = editMaskCtx.getImageData(0, 0, w, h);
-    const origCvs = document.createElement('canvas'); origCvs.width = w; origCvs.height = h;
-    const octx = origCvs.getContext('2d'); octx.drawImage(editOrigImg, 0, 0);
-    const odata = octx.getImageData(0, 0, w, h);
-    for (let i = 0; i < mdata.data.length; i += 4) {
-      if (mdata.data[i] > 128) {
-        idata.data[i] = odata.data[i];
-        idata.data[i+1] = odata.data[i+1];
-        idata.data[i+2] = odata.data[i+2];
-        idata.data[i+3] = odata.data[i+3];
-      }
-    }
-    ctx.putImageData(idata, 0, 0);
-  }
+  ctx.globalAlpha = 1;
+
   // 套索路径
-  if (editMode === 'lasso' && editLassoPts.length > 1) {
     ctx.strokeStyle = '#5b9cf5'; ctx.lineWidth = 2 / editZoom;
     ctx.setLineDash([6 / editZoom, 4 / editZoom]);
     ctx.beginPath();
@@ -954,6 +1054,8 @@ async function aiRetryLasso() {
   const cropBlob = await new Promise(res => cropCvs.toBlob(res, 'image/png'));
 
   editorHint.textContent = '🤖 AI 识别套索区域边缘中…';
+  $('aiProgress').style.display = 'inline';
+  $('btnAiRetry').disabled = true;
   try {
     const aiBlob = await removeBackgroundFn(cropBlob, { output: { format: 'image/png' } });
     const aiImg = await new Promise((resolve, reject) => {
@@ -990,6 +1092,8 @@ async function aiRetryLasso() {
   } catch (e) {
     editorHint.textContent = '❌ AI 处理失败：' + e.message;
   }
+  $('aiProgress').style.display = 'none';
+  $('btnAiRetry').disabled = false;
   editLassoPts = [];
   renderEditor();
 }
