@@ -108,7 +108,7 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
 <div class="container">
   <header>
     <h1>批量抠图 · 液态玻璃工坊</h1>
-    <p>纯本地 Canvas 引擎 · 不上传 · 无需网络 · 即开即用</p>
+    <p>Canvas 引擎 + 可选 AI（Hugging Face） · 免费无限使用</p>
   </header>
 
   <div class="upload-zone" id="uploadZone">
@@ -116,6 +116,13 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
     <div class="label">拖拽图片 · 点击选择 · Ctrl+V 粘贴</div>
     <div class="hint">JPG / PNG / WebP · 多选 · 点击背景色自动识别 · 零网络依赖</div>
     <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" multiple>
+  </div>
+
+  <div class="settings">
+    <span style="font-size:12px;color:var(--accent);font-weight:600">🤖 AI</span>
+    <input type="text" id="hfToken" placeholder="HF Token（可选）" style="flex:1;min-width:120px;padding:5px 8px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(0,0,0,.3);color:var(--text);font-size:12px;font-family:monospace;outline:none">
+    <a href="https://huggingface.co/settings/tokens" target="_blank" style="font-size:10px;color:var(--accent);white-space:nowrap">获取免费Token</a>
+    <span id="aiStatus" style="font-size:10px;color:var(--text-secondary)"></span>
   </div>
 
   <div class="settings">
@@ -215,6 +222,61 @@ async function makeZip(files){
   for(const c of ch){all.set(c,p);p+=c.length}
   all.set(e,p);return new Blob([all],{type:'application/zip'});
 }
+
+// ===== Hugging Face AI 抠图 =====
+async function removeBgAI(inputUrl, token){
+  // 获取图片 Blob
+  const resp=await fetch(inputUrl);
+  const imgBlob=await resp.blob();
+
+  // 调用 briaai/RMBG-2.0 模型
+  const apiResp=await fetch('https://api-inference.huggingface.co/models/briaai/RMBG-2.0',{
+    method:'POST',
+    headers:{'Authorization':'Bearer '+token},
+    body:imgBlob,
+  });
+
+  if(!apiResp.ok){
+    const err=await apiResp.text();
+    throw new Error(`API ${apiResp.status}: ${err.slice(0,100)}`);
+  }
+
+  // 返回 mask（黑白图，白色=前景）
+  const maskBlob=await apiResp.blob();
+  const maskImg=await loadImage(URL.createObjectURL(maskBlob));
+
+  // 用 mask 合成透明 PNG
+  const origImg=await loadImage(inputUrl);
+  const w=origImg.naturalWidth,h=origImg.naturalHeight;
+  const cvs=document.createElement('canvas');cvs.width=w;cvs.height=h;
+  const ctx=cvs.getContext('2d');
+  ctx.drawImage(origImg,0,0);
+  // mask 可能尺寸不同，需要缩放
+  const mCvs=document.createElement('canvas');mCvs.width=w;mCvs.height=h;
+  const mCtx=mCvs.getContext('2d');mCtx.drawImage(maskImg,0,0,w,h);
+  const src=ctx.getImageData(0,0,w,h);
+  const mask=mCtx.getImageData(0,0,w,h);
+  for(let i=0;i<src.data.length;i+=4){
+    // mask 白色=255=前景保留，黑色=0=背景透明
+    src.data[i+3]=mask.data[i]; // 用 mask 亮度做 alpha
+  }
+  ctx.putImageData(src,0,0);
+  const blob=await new Promise(r=>cvs.toBlob(r,'image/png'));
+
+  // 同时返回 mask ImageData 给编辑器用
+  return {blob, mask:mCtx.getImageData(0,0,w,h)};
+}
+
+// Token 管理
+$('hfToken').addEventListener('input',function(){
+  localStorage.setItem('hf_token',this.value.trim());
+  $('aiStatus').textContent=this.value.trim()?'✅ AI 已启用':'';
+});
+// 加载已保存的 token
+(function(){
+  const saved=localStorage.getItem('hf_token');
+  if(saved){$('hfToken').value=saved;$('aiStatus').textContent='✅ AI 已启用'}
+})();
 
 // ===== Canvas 抠图引擎 =====
 function loadImage(blob){
@@ -394,7 +456,22 @@ async function processImage(id,tol){
   const job=jobs.get(id);if(!job)return;
   try{
     $(`st-${id}`).textContent='正在抠图…';
-    let blob=await removeBgCanvas(job.blobUrl,tol);
+    // 优先用 AI，失败回退 Canvas
+    const hfToken=$('hfToken').value.trim();
+    let blob,aiMask=null;
+    if(hfToken){
+      try{
+        $(`st-${id}`).textContent='🤖 AI 抠图中…';
+        const result=await removeBgAI(job.blobUrl,hfToken);
+        blob=result.blob;
+        aiMask=result.mask; // ImageData mask
+        job.aiMask=aiMask; // 保存给编辑器用
+      }catch(e){console.warn('AI失败，回退Canvas:',e.message);$(`st-${id}`).textContent='AI失败，回退Canvas…'}
+    }
+    if(!blob){
+      blob=await removeBgCanvas(job.blobUrl,tol);
+      job.aiMask=null;
+    }
     $(`st-${id}`).textContent='清晰化…';
     blob=await sharpenBlob(blob,1);
     const tw=parseInt($('outW').value)||0,th=parseInt($('outH').value)||0;
@@ -611,14 +688,23 @@ async function edOpen(id){
   const job=jobs.get(id);if(!job?.resultBlob)return;
   edId=id;edUndoStack=[];edZoom=1;edPX=0;edPY=0;edShowOrig=false;edSelMask=null;
   $('edViewBtn').textContent='🔄 原图';
-  $('edHint').textContent='点击要选取的区域 · 调整容差 · 点删除';
+  $('edHint').textContent=job.aiMask?'🤖 AI 已预处理 · 点击智能选取或涂抹微调':'点击要选取的区域 · 调整容差 · 点删除';
   edOrig=await loadImage(job.blobUrl);
   edResult=await loadImage(job.resultUrl);
   const w=edResult.naturalWidth,h=edResult.naturalHeight;
   edMaskCvs=document.createElement('canvas');edMaskCvs.width=w;edMaskCvs.height=h;
   edMaskCtx=edMaskCvs.getContext('2d');edMaskCtx.fillStyle='#000';edMaskCtx.fillRect(0,0,w,h);
+  // 如果有 AI mask，把 AI 认为的前景标记为已恢复（白色=保留）
+  if(job.aiMask&&job.aiMask.width===w&&job.aiMask.height===h){
+    const md=edMaskCtx.getImageData(0,0,w,h);
+    const am=job.aiMask;
+    for(let i=0;i<md.data.length;i+=4){
+      if(am.data[i]>128){md.data[i]=255;md.data[i+1]=255;md.data[i+2]=255;md.data[i+3]=255}
+    }
+    edMaskCtx.putImageData(md,0,0);
+    $('edHint').textContent='🤖 AI 智能识别完成 · 可用涂抹微调边缘';
+  }
   edCvs.width=w;edCvs.height=h;
-  // 重置为智能选取模式
   edTool='magic';document.querySelectorAll('.ed-tool-btn').forEach(x=>x.classList.remove('active'));
   document.querySelector('[data-tool="magic"]').classList.add('active');
   $('optMagic').classList.remove('hide');$('optBrush').classList.add('hide');$('optRemove').classList.add('hide');
