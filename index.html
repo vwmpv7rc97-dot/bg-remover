@@ -11,24 +11,27 @@
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
 :root{--bg:#0f0f1a;--glass:rgba(255,255,255,0.06);--glass-border:rgba(255,255,255,0.08);--text:#e8e8ed;--text-secondary:#9494a8;--accent:#5b9cf5;--success:#34d399;--error:#f87171;--warning:#fbbf24;--radius:20px;--radius-sm:12px;--safe-b:env(safe-area-inset-bottom,0px);--safe-t:env(safe-area-inset-top,0px)}
 body{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);background-image:radial-gradient(ellipse at 50% 0%,rgba(91,156,245,0.06) 0%,transparent 60%),radial-gradient(ellipse at 80% 80%,rgba(139,92,246,0.04) 0%,transparent 50%);color:var(--text);min-height:100dvh;-webkit-tap-highlight-color:transparent;padding:20px;padding-top:calc(20px + var(--safe-t));padding-bottom:calc(20px + var(--safe-b))}
-.container{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:20px}
-header{text-align:center;padding:8px 0}
+.container{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header{text-align:center;padding:6px 0}
 header h1{font-size:clamp(22px,5vw,34px);font-weight:700;letter-spacing:.04em;background:linear-gradient(135deg,#e8e8ed 0%,#5b9cf5 50%,#a78bfa 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-header p{font-size:13px;color:var(--text-secondary);margin-top:6px}
-.upload-zone{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:2px dashed var(--glass-border);border-radius:var(--radius);padding:40px 20px;text-align:center;cursor:pointer;transition:all .3s}
+header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
+.upload-zone{background:var(--glass);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:2px dashed var(--glass-border);border-radius:var(--radius);padding:36px 20px;text-align:center;cursor:pointer;transition:all .3s}
 .upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:rgba(255,255,255,0.08)}
-.upload-zone .icon{font-size:36px;margin-bottom:10px}
-.upload-zone .label{font-size:15px;font-weight:600;letter-spacing:.04em}
-.upload-zone .hint{font-size:12px;color:var(--text-secondary);margin-top:5px;line-height:1.5}
+.upload-zone .icon{font-size:34px;margin-bottom:8px}
+.upload-zone .label{font-size:15px;font-weight:600}
+.upload-zone .hint{font-size:12px;color:var(--text-secondary);margin-top:4px;line-height:1.5}
 .upload-zone input{display:none}
-.status-bar{background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px 16px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--text-secondary)}
-.status-bar .dot{width:7px;height:7px;border-radius:50%;background:var(--accent);flex-shrink:0}
-.status-bar .dot.err{background:var(--error)}
-.status-bar .txt{flex:1}
-.size-row{background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px 14px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary)}
-.size-row input{width:72px;padding:6px 8px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(0,0,0,.3);color:var(--text);font-size:13px;font-family:inherit;text-align:center;outline:none}
-.size-row input:focus{border-color:var(--accent)}
+
+.settings{background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:12px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--text-secondary)}
+.settings label{white-space:nowrap}
+.settings input[type=range]{flex:1;min-width:80px;accent-color:var(--accent)}
+.settings input[type=number]{width:68px;padding:5px 8px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(0,0,0,.3);color:var(--text);font-size:13px;font-family:inherit;text-align:center;outline:none}
+.settings input:focus{border-color:var(--accent)}
+.settings .val{color:var(--text);min-width:28px;text-align:center}
+
 .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.toolbar .status{font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px}
+.toolbar .dot{width:7px;height:7px;border-radius:50%;background:var(--success);flex-shrink:0}
 .btn{padding:10px 18px;border-radius:var(--radius-sm);border:none;font-size:13px;font-weight:590;cursor:pointer;letter-spacing:.04em;font-family:inherit;transition:all .2s;white-space:nowrap}
 .btn-glass{background:var(--glass);color:var(--text);border:1px solid var(--glass-border)}
 .btn-glass:hover{background:rgba(255,255,255,0.08);transform:translateY(-1px)}
@@ -37,49 +40,41 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:6px}
 .btn-accent{background:var(--accent);color:#fff;box-shadow:0 4px 20px rgba(91,156,245,0.3)}
 .btn-accent:hover{transform:translateY(-1px)}
 .btn-accent:active{transform:scale(.97)}
-.btn-accent:disabled{opacity:.35;pointer-events:none}
+.btn-accent:disabled{opacity:.35;pointer-events:none;box-shadow:none}
 .btn-danger{background:rgba(248,113,113,0.15);color:var(--error);border:1px solid rgba(248,113,113,0.2)}
 .btn-danger:hover{background:rgba(248,113,113,0.25)}
 .btn-sm{padding:6px 14px;font-size:12px;border-radius:10px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:14px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:14px}
 .grid:empty{display:none}
 .grid:empty~.empty-state{display:flex}
 .empty-state{display:none;flex-direction:column;align-items:center;padding:50px 20px;color:var(--text-secondary);text-align:center}
 .empty-state .icon{font-size:44px;margin-bottom:10px;opacity:.5}
 .empty-state p{font-size:13px;line-height:1.6}
+
 .card{background:var(--glass);backdrop-filter:blur(30px);border:1px solid var(--glass-border);border-radius:var(--radius);padding:14px;display:flex;flex-direction:column;gap:10px;transition:all .3s}
-.card:hover{border-color:rgba(255,255,255,.14);transform:translateY(-2px)}
+.card:hover{border-color:rgba(255,255,255,.14)}
 .card.done{border-color:rgba(52,211,153,.15)}
-.card.error{border-color:rgba(248,113,113,.2)}
 .card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .card-name{font-size:12px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
-.card-badge{font-size:10px;padding:2px 8px;border-radius:20px;letter-spacing:.04em;flex-shrink:0}
-.badge-pending{background:rgba(148,148,168,.12);color:var(--text-secondary)}
-.badge-downloading{background:rgba(251,191,36,.1);color:var(--warning)}
-.badge-processing{background:rgba(91,156,245,.1);color:var(--accent)}
-.badge-done{background:rgba(52,211,153,.1);color:var(--success)}
-.badge-error{background:rgba(248,113,113,.1);color:var(--error)}
 .card-compare{display:flex;gap:6px}
 .card-img-wrap{flex:1;aspect-ratio:1;border-radius:var(--radius-sm);overflow:hidden;background:rgba(0,0,0,.3);display:flex;align-items:center;justify-content:center;position:relative}
 .card-img-wrap img{width:100%;height:100%;object-fit:contain;position:absolute;inset:0}
 .card-img-wrap .placeholder{font-size:11px;color:var(--text-secondary);text-align:center;padding:6px}
 .card-img-wrap.final{background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20'%3E%3Crect width='10' height='10' fill='%23ffffff10'/%3E%3Crect x='10' y='10' width='10' height='10' fill='%23ffffff10'/%3E%3C/svg%3E")}
-.card-progress{height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden}
-.card-progress-bar{height:100%;background:var(--accent);border-radius:2px;transition:width .3s;width:0%}
-.card-progress-bar.done{background:var(--success)}
-.card-progress-bar.error{background:var(--error)}
-.card-status-text{font-size:10px;color:var(--text-secondary)}
+.card-status{font-size:10px;color:var(--text-secondary)}
 .card-actions{display:flex;gap:6px;justify-content:flex-end}
-.card-error-msg{font-size:10px;color:var(--error);line-height:1.4}
 
 @media(max-width:500px){
-  body{padding:10px;padding-top:calc(10px + var(--safe-t));padding-bottom:calc(10px + var(--safe-b))}
-  .container{gap:14px}
+  body{padding:10px;padding-top:calc(10px+var(--safe-t));padding-bottom:calc(10px+var(--safe-b))}
+  .container{gap:12px}
   .grid{grid-template-columns:1fr}
-  .upload-zone{padding:28px 14px}
+  .upload-zone{padding:26px 14px}
   .toolbar{flex-direction:column;align-items:stretch}
   .toolbar .actions{display:flex;gap:8px}
   .toolbar .actions .btn{flex:1;text-align:center}
+  .settings{gap:8px}
+  .settings input[type=range]{min-width:60px}
 }
 @media(min-width:901px){.grid{grid-template-columns:repeat(auto-fill,minmax(370px,1fr))}}
 </style>
@@ -89,408 +84,283 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:6px}
 <div class="container">
   <header>
     <h1>批量抠图 · 液态玻璃工坊</h1>
-    <p>国产模型 · 本地处理 · 隐私安全</p>
+    <p>纯本地 Canvas 引擎 · 不上传 · 无需网络 · 即开即用</p>
   </header>
 
   <div class="upload-zone" id="uploadZone">
     <div class="icon">🖼️</div>
     <div class="label">拖拽图片 · 点击选择 · Ctrl+V 粘贴</div>
-    <div class="hint">支持 JPG / PNG / WebP · 多选 · 图片不上传服务器</div>
+    <div class="hint">JPG / PNG / WebP · 多选 · 点击背景色自动识别 · 零网络依赖</div>
     <input type="file" id="fileInput" accept="image/jpeg,image/png,image/webp" multiple>
   </div>
 
-  <div class="status-bar">
-    <span class="dot" id="statusDot"></span>
-    <span class="txt" id="statusText">正在从 npmmirror（阿里镜像）加载引擎…</span>
-  </div>
-
-  <div class="size-row">
-    <span>输出尺寸</span>
-    <input type="number" id="outW" placeholder="宽" min="0" step="1" inputmode="numeric">
-    <span>×</span>
-    <input type="number" id="outH" placeholder="高" min="0" step="1" inputmode="numeric">
-    <span style="font-size:10px">留空=原始尺寸 · 不足补透明居中</span>
+  <div class="settings">
+    <label>🎨 容差</label>
+    <input type="range" id="tolerance" min="5" max="120" value="40" step="1">
+    <span class="val" id="toleranceVal">40</span>
+    <label style="margin-left:8px">📐 输出宽</label>
+    <input type="number" id="outW" placeholder="原始" min="0" step="1" inputmode="numeric">
+    <label>×</label>
+    <input type="number" id="outH" placeholder="原始" min="0" step="1" inputmode="numeric">
   </div>
 
   <div class="toolbar">
-    <div></div>
+    <div class="status"><span class="dot" id="dot"></span><span id="statusMsg">就绪</span></div>
     <div class="actions" style="display:flex;gap:8px">
-      <button class="btn btn-accent" id="btnZip" disabled onclick="downloadZip()">📦 下载 ZIP</button>
-      <button class="btn btn-danger" id="btnClear" disabled onclick="clearAll()">🗑 清空</button>
+      <button class="btn btn-accent" id="btnZip" disabled>📦 下载 ZIP</button>
+      <button class="btn btn-danger" id="btnClear" disabled>🗑 清空</button>
     </div>
   </div>
 
   <div class="grid" id="grid"></div>
   <div class="empty-state" id="emptyState">
     <div class="icon">📂</div>
-    <p>拖拽图片到上方区域<br>或按 Ctrl+V 粘贴剪贴板中的图片</p>
+    <p>拖拽图片到上方区域<br>或按 Ctrl+V 粘贴剪贴板</p>
   </div>
 </div>
 
 <script>
-// ===== 轻量 JSZip（内联实现，零 CDN 依赖） =====
-// 仅实现 ZIP 打包所需的 store 模式
-const SimpleZip = {
-  _files: [],
-  file(name, blob) { this._files.push({ name, blob }); },
-  async generate() {
-    // 手动构造 ZIP 格式
-    const encoder = new TextEncoder();
-    const parts = [];
-    const localHeaders = [];
-    const centralHeaders = [];
-    let offset = 0;
+const $=id=>document.getElementById(id);
+const jobs=new Map();let jc=0;
 
-    for (const f of this._files) {
-      const nameBytes = encoder.encode(f.name);
-      const data = new Uint8Array(await f.blob.arrayBuffer());
-      const crc = crc32(data);
+// ===== 内联 ZIP =====
+const crcTab=new Uint32Array(256);
+for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);crcTab[n]=c}
+function crc32(d){let c=0xFFFFFFFF;for(let i=0;i<d.length;i++)c=crcTab[(c^d[i])&0xFF]^(c>>>8);return(c^0xFFFFFFFF)>>>0}
+function w16(a,o,v){a[o]=v&0xFF;a[o+1]=(v>>8)&0xFF}
+function w32(a,o,v){a[o]=v&0xFF;a[o+1]=(v>>8)&0xFF;a[o+2]=(v>>16)&0xFF;a[o+3]=(v>>24)&0xFF}
+function dlBlob(b,n){const u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=n;document.body.appendChild(a);a.click();document.body.removeChild(a);setTimeout(()=>URL.revokeObjectURL(u),1000)}
 
-      // Local file header
-      const local = new Uint8Array(30 + nameBytes.length);
-      local.set([0x50, 0x4b, 0x03, 0x04], 0); // signature
-      local.set([10, 0], 4); // version
-      local.set([0, 0], 6); // flags
-      local.set([0, 0], 8); // compression (store)
-      write16(local, 10, 0); write16(local, 12, 0); // time/date
-      write32(local, 14, crc);
-      write32(local, 18, data.length); // compressed size
-      write32(local, 22, data.length); // uncompressed size
-      write16(local, 26, nameBytes.length);
-      write16(local, 28, 0); // extra field length
-      local.set(nameBytes, 30);
-      parts.push(local); localHeaders.push({ offset, size: local.length + data.length });
-      parts.push(data);
-      offset += local.length + data.length;
-
-      // Central directory header
-      const central = new Uint8Array(46 + nameBytes.length);
-      central.set([0x50, 0x4b, 0x01, 0x02], 0);
-      central.set([10, 0], 4); // version made by
-      central.set([10, 0], 6); // version needed
-      central.set([0, 0], 8); // flags
-      central.set([0, 0], 10); // compression
-      write16(central, 12, 0); write16(central, 14, 0); // time/date
-      write32(central, 16, crc);
-      write32(central, 20, data.length);
-      write32(central, 24, data.length);
-      write16(central, 28, nameBytes.length);
-      write16(central, 30, 0); write16(central, 32, 0); // extra/comment
-      write16(central, 34, 0); // disk
-      write16(central, 36, 0); // internal attrs
-      write32(central, 38, 0); // external attrs
-      write32(central, 42, localHeaders[localHeaders.length-1].offset);
-      central.set(nameBytes, 46);
-      centralHeaders.push(central);
-    }
-
-    const cdOffset = offset;
-    const cdSize = centralHeaders.reduce((s, c) => s + c.length, 0);
-
-    // EOCD
-    const eocd = new Uint8Array(22);
-    eocd.set([0x50, 0x4b, 0x05, 0x06], 0);
-    write16(eocd, 4, 0); write16(eocd, 6, 0); // disk
-    write16(eocd, 8, this._files.length); write16(eocd, 10, this._files.length);
-    write32(eocd, 12, cdSize); write32(eocd, 16, cdOffset);
-    write16(eocd, 20, 0);
-
-    const all = new Uint8Array(offset + cdSize + 22);
-    let pos = 0;
-    for (const p of parts) { all.set(new Uint8Array(p.buffer || p), pos); pos += p.length; }
-    for (const c of centralHeaders) { all.set(c, pos); pos += c.length; }
-    all.set(eocd, pos);
-
-    this._files = [];
-    return new Blob([all], { type: 'application/zip' });
+async function makeZip(files){
+  const enc=new TextEncoder();const parts=[];const lh=[];const ch=[];let off=0;
+  for(const f of files){
+    const nb=enc.encode(f.name);const d=new Uint8Array(await f.blob.arrayBuffer());const crc=crc32(d);
+    const l=new Uint8Array(30+nb.length);l.set([0x50,0x4b,0x03,0x04],0);l.set([10,0],4);w16(l,10,0);w16(l,12,0);w32(l,14,crc);w32(l,18,d.length);w32(l,22,d.length);w16(l,26,nb.length);w16(l,28,0);l.set(nb,30);
+    parts.push(l);lh.push({o:off,s:l.length+d.length});parts.push(d);off+=l.length+d.length;
+    const c=new Uint8Array(46+nb.length);c.set([0x50,0x4b,0x01,0x02],0);c.set([10,0],4);c.set([10,0],6);w16(c,10,0);w16(c,12,0);w16(c,14,0);w16(c,16,0);w32(c,20,d.length);w32(c,24,d.length);w16(c,28,nb.length);w16(c,30,0);w16(c,32,0);w16(c,34,0);w16(c,36,0);w32(c,38,0);w32(c,42,lh[lh.length-1].o);c.set(nb,46);ch.push(c);
   }
-};
-
-function write16(arr, off, v) { arr[off] = v & 0xFF; arr[off+1] = (v >> 8) & 0xFF; }
-function write32(arr, off, v) { arr[off] = v & 0xFF; arr[off+1] = (v >> 8) & 0xFF; arr[off+2] = (v >> 16) & 0xFF; arr[off+3] = (v >> 24) & 0xFF; }
-
-const crcTable = new Uint32Array(256);
-for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); crcTable[n] = c; }
-function crc32(data) {
-  let c = 0xFFFFFFFF;
-  for (let i = 0; i < data.length; i++) c = crcTable[(c ^ data[i]) & 0xFF] ^ (c >>> 8);
-  return (c ^ 0xFFFFFFFF) >>> 0;
+  const cdo=off,cds=ch.reduce((s,c)=>s+c.length,0);
+  const e=new Uint8Array(22);e.set([0x50,0x4b,0x05,0x06],0);w16(e,8,files.length);w16(e,10,files.length);w32(e,12,cds);w32(e,16,cdo);
+  const all=new Uint8Array(off+cds+22);let p=0;
+  for(const x of parts){all.set(new Uint8Array(x.buffer||x),p);p+=x.length}
+  for(const c of ch){all.set(c,p);p+=c.length}
+  all.set(e,p);return new Blob([all],{type:'application/zip'});
 }
 
-function downloadBlob(blob, name) {
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url; a.download = name;
-  document.body.appendChild(a); a.click();
-  document.body.removeChild(a);
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+// ===== Canvas 抠图引擎 =====
+function loadImage(blob){
+  return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=URL.createObjectURL(blob)});
 }
 
-// ===== 全局状态 =====
-const $ = id => document.getElementById(id);
-const jobs = new Map();
-let jobCounter = 0;
-let activeCount = 0;
-let removeBgFn = null;
-
-// ===== 初始化 DOM 事件 =====
-const uploadZone = $('uploadZone');
-const fileInput = $('fileInput');
-const grid = $('grid');
-const emptyState = $('emptyState');
-const statusDot = $('statusDot');
-const statusText = $('statusText');
-const btnZip = $('btnZip');
-const btnClear = $('btnClear');
-
-uploadZone.addEventListener('click', () => fileInput.click());
-fileInput.addEventListener('change', () => handleFiles(fileInput.files));
-uploadZone.addEventListener('dragover', e => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
-uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
-uploadZone.addEventListener('drop', e => { e.preventDefault(); uploadZone.classList.remove('drag-over'); handleFiles(e.dataTransfer.files); });
-document.addEventListener('paste', e => {
-  const items = e.clipboardData?.items;
-  if (!items) return;
-  const files = [];
-  for (const item of items) { if (item.type.startsWith('image/')) { const f = item.getAsFile(); if (f) files.push(f); } }
-  if (files.length) { e.preventDefault(); handleFiles(files); }
-});
-
-// ===== 并行竞速加载引擎（6 个源同时尝试，谁快用谁） =====
-const ENGINE_SOURCES = [
-  'https://registry.npmmirror.com/@imgly/background-removal/1.6.0/files/dist/index.mjs',
-  'https://esm.sh/@imgly/background-removal@1.6.0',
-  'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.6.0/dist/index.mjs',
-  'https://unpkg.com/@imgly/background-removal@1.6.0/dist/index.mjs',
-  'https://cdn.skypack.dev/@imgly/background-removal@1.6.0',
-  'https://fastly.jsdelivr.net/npm/@imgly/background-removal@1.6.0/dist/index.mjs',
-];
-
-async function tryOneImport(url, timeoutMs) {
-  // 方案A：直接 import（需要 CORS）
-  try {
-    const mod = await Promise.race([
-      import(url),
-      new Promise((_, r) => setTimeout(() => r(new Error()), timeoutMs))
-    ]);
-    if (mod.removeBackground) return mod;
-  } catch (e) {}
-  // 方案B：fetch 源码 → Blob URL → import（绕过部分CORS问题）
-  try {
-    const resp = await Promise.race([
-      fetch(url, { mode: 'cors' }),
-      new Promise((_, r) => setTimeout(() => r(new Error()), timeoutMs))
-    ]);
-    if (resp.ok) {
-      const source = await resp.text();
-      const blob = new Blob([source], { type: 'application/javascript' });
-      const blobUrl = URL.createObjectURL(blob);
-      const mod = await import(blobUrl);
-      URL.revokeObjectURL(blobUrl);
-      if (mod.removeBackground) return mod;
-    }
-  } catch (e) {}
-  return null;
-}
-
-(async function boot() {
-  statusText.textContent = '并行连接 6 个 CDN 加载引擎…';
-  statusDot.className = 'dot';
-
-  // 所有源同时出发，8 秒超时
-  const results = await Promise.allSettled(
-    ENGINE_SOURCES.map(url => tryOneImport(url, 8000))
-  );
-
-  const winner = results.find(r => r.status === 'fulfilled' && r.value);
-  if (winner) {
-    removeBgFn = winner.value.removeBackground;
-    statusDot.className = 'dot';
-    statusText.textContent = '引擎就绪 · 模型将在首次抠图时下载';
-    flushQueue();
-    return;
-  }
-
-  // 全部失败
-  statusDot.className = 'dot err';
-  statusText.textContent = '所有 CDN 均无法连接。可尝试：1) 切换 WiFi/4G 2) 使用代理 3) 刷新重试';
-})();
-
-// ===== 排队机制 =====
-let pendingQueue = [];
-function flushQueue() {
-  if (!removeBgFn) return;
-  for (const id of pendingQueue) processImage(id);
-  pendingQueue = [];
-}
-
-// ===== 文件处理 =====
-function handleFiles(fileList) {
-  const files = Array.from(fileList).filter(f => f.type.startsWith('image/'));
-  if (!files.length) return;
-  for (const file of files) {
-    const id = ++jobCounter;
-    const blobUrl = URL.createObjectURL(file);
-    jobs.set(id, { file, blobUrl, resultBlob: null, resultUrl: null, status: 'pending', error: null });
-    createCard(id, file.name, blobUrl);
-    if (removeBgFn) processImage(id); else { pendingQueue.push(id); $(`statusText-${id}`).textContent = '等待引擎…'; $(`badge-${id}`).className = 'card-badge badge-downloading'; $(`badge-${id}`).textContent = '排队'; }
-  }
-  updateToolbar();
-  emptyState.style.display = 'none';
-  fileInput.value = '';
-}
-
-// ===== 卡片 =====
-function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
-function badge(id, cls, text) { const b = $(`badge-${id}`); if (b) { b.className = 'card-badge ' + cls; b.textContent = text; } }
-
-function createCard(id, name, blobUrl) {
-  const card = document.createElement('div');
-  card.className = 'card'; card.id = `card-${id}`;
-  card.innerHTML = `
-    <div class="card-top"><span class="card-name" title="${esc(name)}">${esc(name)}</span><span class="card-badge badge-pending" id="badge-${id}">排队</span></div>
-    <div class="card-compare"><div class="card-img-wrap"><img src="${blobUrl}"></div><div class="card-img-wrap final" id="result-${id}"><span class="placeholder">等待</span></div></div>
-    <div class="card-progress"><div class="card-progress-bar" id="progress-${id}"></div></div>
-    <div class="card-status-text" id="statusText-${id}">排队中…</div>
-    <div class="card-actions" id="actions-${id}"></div>
-    <div class="card-error-msg" id="error-${id}" style="display:none"></div>`;
-  grid.appendChild(card);
-}
-
-// ===== 抠图 =====
-async function processImage(id) {
-  const job = jobs.get(id);
-  if (!job || !removeBgFn) return;
-  job.status = 'processing'; activeCount++;
-  updateStatus(); updateToolbar();
-  const progressBar = $(`progress-${id}`);
-  const statusEl = $(`statusText-${id}`);
-
-  try {
-    statusEl.textContent = '下载模型中…';
-    badge(id, 'badge-downloading', '下载');
-    const config = {
-      output: { format: 'image/png' },
-      progress: (key, current, total) => {
-        if ((key === 'fetch:model' || key.startsWith('download')) && total > 0) {
-          const pct = Math.round((current / total) * 100);
-          progressBar.style.width = Math.max(3, pct * 0.3) + '%';
-          statusEl.textContent = `下载模型 ${pct}%`;
-          badge(id, 'badge-downloading', `${pct}%`);
-        }
-      },
-    };
-    let resultBlob = await removeBgFn(job.blobUrl, config);
-    badge(id, 'badge-processing', '处理');
-    progressBar.style.width = '70%';
-    statusEl.textContent = '处理中…';
-
-    // 尺寸调整
-    const tw = parseInt($('outW').value) || 0;
-    const th = parseInt($('outH').value) || 0;
-    if (tw > 0 || th > 0) { resultBlob = await fitCanvas(resultBlob, tw, th); }
-
-    // 清晰化
-    resultBlob = await sharpenBlob(resultBlob, 1);
-    progressBar.style.width = '95%';
-
-    const resultUrl = URL.createObjectURL(resultBlob);
-    job.resultBlob = resultBlob; job.resultUrl = resultUrl; job.status = 'done';
-    $(`result-${id}`).innerHTML = `<img src="${resultUrl}" alt="结果">`;
-    badge(id, 'badge-done', '✓');
-    progressBar.classList.add('done'); progressBar.style.width = '100%';
-    statusEl.textContent = '完成';
-    $(`actions-${id}`).innerHTML = `<button class="btn btn-glass btn-sm" onclick="downloadOne(${id})">💾 下载</button>`;
-  } catch (e) {
-    job.status = 'error'; job.error = e.message || '未知';
-    badge(id, 'badge-error', '失败');
-    progressBar.classList.add('error'); progressBar.style.width = '100%';
-    statusEl.textContent = '失败';
-    $(`result-${id}`).innerHTML = '<span class="placeholder">❌</span>';
-    $(`error-${id}`).textContent = job.error;
-    $(`error-${id}`).style.display = 'block';
-  }
-  activeCount--; updateStatus(); updateToolbar();
-}
-
-function updateStatus() {
-  if (!removeBgFn) return;
-  statusDot.className = activeCount > 0 ? 'dot' : 'dot';
-  statusText.textContent = activeCount > 0 ? `处理中 · ${activeCount} 张` : '就绪 · 等待上传';
-}
-
-function updateToolbar() {
-  const all = Array.from(jobs.values());
-  const done = all.filter(j => j.status === 'done');
-  btnClear.disabled = all.length === 0;
-  btnZip.disabled = done.length === 0;
-  btnZip.textContent = `📦 下载 ZIP${done.length ? ` (${done.length})` : ''}`;
-  if (!all.length) emptyState.style.display = 'flex';
-}
-
-// ===== 下载 =====
-function downloadOne(id) {
-  const job = jobs.get(id);
-  if (!job?.resultBlob) return;
-  downloadBlob(job.resultBlob, job.file.name.replace(/\.[^.]+$/, '') + '（扣图版）.png');
-}
-
-async function downloadZip() {
-  const done = Array.from(jobs.values()).filter(j => j.status === 'done' && j.resultBlob);
-  if (!done.length) return;
-  const zip = new SimpleZip();
-  const seen = new Map();
-  for (const job of done) {
-    let name = job.file.name.replace(/\.[^.]+$/, '') + '（扣图版）.png';
-    if (seen.has(name)) { let n = 1; while (seen.has(name.replace('（扣图版）', `（${n}）（扣图版）`))) n++; name = name.replace('（扣图版）', `（${n}）（扣图版）`); }
-    seen.set(name, true);
-    zip.file(name, job.resultBlob);
-  }
-  downloadBlob(await zip.generate(), '抠图结果.zip');
-}
-
-function clearAll() {
-  for (const [, job] of jobs) { if (job.blobUrl) URL.revokeObjectURL(job.blobUrl); if (job.resultUrl) URL.revokeObjectURL(job.resultUrl); }
-  jobs.clear(); grid.innerHTML = ''; emptyState.style.display = 'flex'; updateToolbar();
-}
-
-// ===== Canvas 工具 =====
-async function fitCanvas(blob, tw, th) {
-  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(blob); });
-  const w = img.naturalWidth, h = img.naturalHeight;
-  const ow = tw > 0 ? tw : w, oh = th > 0 ? th : h;
-  const cvs = document.createElement('canvas'); cvs.width = ow; cvs.height = oh;
-  const ctx = cvs.getContext('2d');
-  const scale = Math.min(ow / w, oh / h, 1);
-  ctx.drawImage(img, (ow - w * scale) / 2, (oh - h * scale) / 2, w * scale, h * scale);
-  return new Promise(r => cvs.toBlob(r, 'image/png'));
-}
-
-async function sharpenBlob(blob, strength) {
-  if (strength <= 0) return blob;
-  const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = URL.createObjectURL(blob); });
-  const cvs = document.createElement('canvas'); cvs.width = img.naturalWidth; cvs.height = img.naturalHeight;
-  const ctx = cvs.getContext('2d'); ctx.drawImage(img, 0, 0);
-  const w = cvs.width, h = cvs.height;
-  const src = ctx.getImageData(0, 0, w, h);
-  const dst = ctx.createImageData(w, h);
-  const s = strength;
-  const k = [0, -s/4, 0, -s/4, 1+s, -s/4, 0, -s/4, 0];
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      let r=0,g=0,b=0,a=0;
-      for (let ky=0;ky<3;ky++) for (let kx=0;kx<3;kx++) {
-        const sx2 = Math.min(w-1,Math.max(0,x+kx-1)), sy2 = Math.min(h-1,Math.max(0,y+ky-1));
-        const idx = (sy2*w+sx2)*4, kv = k[ky*3+kx];
-        r+=src.data[idx]*kv;g+=src.data[idx+1]*kv;b+=src.data[idx+2]*kv;a+=src.data[idx+3]*kv;
+// 从四角 + 四边中点采样背景色
+function sampleEdgeColors(imageData, sampleSize){
+  const w=imageData.width,h=imageData.height,d=imageData.data;
+  const samples=[];
+  const ss=Math.min(sampleSize,Math.min(w,h)>>2);
+  const points=[
+    [0,0],[w-1,0],[0,h-1],[w-1,h-1],
+    [w>>1,0],[w>>1,h-1],[0,h>>1],[w-1,h>>1]
+  ];
+  for(const [sx,sy] of points){
+    for(let dy=0;dy<ss;dy++){
+      for(let dx=0;dx<ss;dx++){
+        const x=Math.min(w-1,Math.max(0,sx+dx-ss/2));
+        const y=Math.min(h-1,Math.max(0,sy+dy-ss/2));
+        const i=(y*w+x)*4;
+        samples.push([d[i],d[i+1],d[i+2]]);
       }
-      const di=(y*w+x)*4;
-      dst.data[di]=Math.min(255,Math.max(0,r));dst.data[di+1]=Math.min(255,Math.max(0,g));
-      dst.data[di+2]=Math.min(255,Math.max(0,b));dst.data[di+3]=Math.min(255,Math.max(0,a));
     }
+  }
+  // 找出现最多的颜色（中位数）
+  samples.sort((a,b)=> (a[0]+a[1]+a[2])-(b[0]+b[1]+b[2]));
+  const mid=samples[Math.floor(samples.length/2)];
+  return {r:mid[0],g:mid[1],b:mid[2]};
+}
+
+function colorDist(r1,g1,b1,r2,g2,b2){
+  // 加权欧几里得距离（人眼感知）
+  const rmean=(r1+r2)/2;
+  const dr=r1-r2,dg=g1-g2,db=b1-b2;
+  return Math.sqrt((2+rmean/256)*dr*dr+4*dg*dg+(2+(255-rmean)/256)*db*db);
+}
+
+async function removeBgCanvas(inputBlob, tolerance){
+  const img=await loadImage(inputBlob);
+  const w=img.naturalWidth,h=img.naturalHeight;
+  const cvs=document.createElement('canvas');cvs.width=w;cvs.height=h;
+  const ctx=cvs.getContext('2d');ctx.drawImage(img,0,0);
+  const src=ctx.getImageData(0,0,w,h);
+  const dst=ctx.createImageData(w,h);
+
+  // 自动检测背景色
+  const bg=sampleEdgeColors(src,Math.min(20,Math.min(w,h)>>3));
+  const tol=tolerance||40;
+
+  for(let i=0;i<src.data.length;i+=4){
+    const r=src.data[i],g=src.data[i+1],b=src.data[i+2];
+    const dist=colorDist(r,g,b,bg.r,bg.g,bg.b);
+    if(dist<=tol){
+      // 背景 → 透明
+      dst.data[i]=r;dst.data[i+1]=g;dst.data[i+2]=b;dst.data[i+3]=0;
+    }else{
+      // 前景 → 保留
+      dst.data[i]=r;dst.data[i+1]=g;dst.data[i+2]=b;dst.data[i+3]=255;
+    }
+  }
+
+  // 羽化边缘（在透明/不透明交界处做平滑）
+  featherEdges(dst,w,h,3);
+
+  ctx.putImageData(dst,0,0);
+  return new Promise(r=>cvs.toBlob(r,'image/png'));
+}
+
+function featherEdges(data,w,h,radius){
+  const d=data.data;
+  const copy=new Uint8ClampedArray(d);
+  for(let y=0;y<h;y++){
+    for(let x=0;x<w;x++){
+      const i=(y*w+x)*4;
+      if(copy[i+3]===255)continue; // 只处理透明像素周围
+      // 检查周围是否有不透明像素
+      let hasOpaque=false;
+      for(let dy=-radius;dy<=radius;dy++){
+        for(let dx=-radius;dx<=radius;dx++){
+          const nx=x+dx,ny=y+dy;
+          if(nx<0||ny<0||nx>=w||ny>=h)continue;
+          if(copy[(ny*w+nx)*4+3]===255){hasOpaque=true;break;}
+        }
+        if(hasOpaque)break;
+      }
+      if(hasOpaque){
+        // 半透明处理
+        d[i+3]=Math.min(255,d[i+3]+80);
+      }
+    }
+  }
+}
+
+// 尺寸调整
+async function fitCanvas(blob,tw,th){
+  const img=await loadImage(blob);
+  const w=img.naturalWidth,h=img.naturalHeight;
+  const ow=tw>0?tw:w,oh=th>0?th:h;
+  const cvs=document.createElement('canvas');cvs.width=ow;cvs.height=oh;
+  const ctx=cvs.getContext('2d');
+  const s=Math.min(ow/w,oh/h,1);
+  ctx.drawImage(img,(ow-w*s)/2,(oh-h*s)/2,w*s,h*s);
+  return new Promise(r=>cvs.toBlob(r,'image/png'));
+}
+
+// 清晰化
+async function sharpenBlob(blob,strength){
+  if(strength<=0)return blob;
+  const img=await loadImage(blob);
+  const w=img.naturalWidth,h=img.naturalHeight;
+  const cvs=document.createElement('canvas');cvs.width=w;cvs.height=h;
+  const ctx=cvs.getContext('2d');ctx.drawImage(img,0,0);
+  const src=ctx.getImageData(0,0,w,h);
+  const dst=ctx.createImageData(w,h);
+  const s=strength;
+  const k=[0,-s/4,0,-s/4,1+s,-s/4,0,-s/4,0];
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    let r=0,g=0,b=0,a=0;
+    for(let ky=0;ky<3;ky++)for(let kx=0;kx<3;kx++){
+      const sx=Math.min(w-1,Math.max(0,x+kx-1)),sy=Math.min(h-1,Math.max(0,y+ky-1));
+      const idx=(sy*w+sx)*4,kv=k[ky*3+kx];
+      r+=src.data[idx]*kv;g+=src.data[idx+1]*kv;b+=src.data[idx+2]*kv;a+=src.data[idx+3]*kv;
+    }
+    const di=(y*w+x)*4;
+    dst.data[di]=Math.min(255,Math.max(0,r));dst.data[di+1]=Math.min(255,Math.max(0,g));
+    dst.data[di+2]=Math.min(255,Math.max(0,b));dst.data[di+3]=Math.min(255,Math.max(0,a));
   }
   ctx.putImageData(dst,0,0);
   return new Promise(r=>cvs.toBlob(r,'image/png'));
+}
+
+// ===== DOM 事件 =====
+$('uploadZone').addEventListener('click',()=>$('fileInput').click());
+$('fileInput').addEventListener('change',()=>handleFiles($('fileInput').files));
+const uz=$('uploadZone');
+uz.addEventListener('dragover',e=>{e.preventDefault();uz.classList.add('drag-over')});
+uz.addEventListener('dragleave',()=>uz.classList.remove('drag-over'));
+uz.addEventListener('drop',e=>{e.preventDefault();uz.classList.remove('drag-over');handleFiles(e.dataTransfer.files)});
+document.addEventListener('paste',e=>{
+  const items=e.clipboardData?.items;if(!items)return;
+  const fs=[];for(const it of items){if(it.type.startsWith('image/')){const f=it.getAsFile();if(f)fs.push(f)}}
+  if(fs.length){e.preventDefault();handleFiles(fs)}
+});
+$('tolerance').addEventListener('input',function(){$('toleranceVal').textContent=this.value});
+$('btnZip').addEventListener('click',downloadZip);
+$('btnClear').addEventListener('click',clearAll);
+
+// ===== 文件处理 =====
+async function handleFiles(fileList){
+  const files=Array.from(fileList).filter(f=>f.type.startsWith('image/'));
+  if(!files.length)return;
+  const tol=parseInt($('tolerance').value)||40;
+  for(const file of files){
+    const id=++jc;
+    const blobUrl=URL.createObjectURL(file);
+    jobs.set(id,{file,blobUrl,resultBlob:null,resultUrl:null,status:'processing'});
+    createCard(id,file.name,blobUrl);
+    processImage(id,tol);
+  }
+  updateUI();
+  $('emptyState').style.display='none';
+  $('fileInput').value='';
+}
+
+function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
+function createCard(id,name,blobUrl){
+  const card=document.createElement('div');card.className='card';card.id='card-'+id;
+  card.innerHTML=`<div class="card-top"><span class="card-name" title="${esc(name)}">${esc(name)}</span></div>
+    <div class="card-compare"><div class="card-img-wrap"><img src="${blobUrl}"></div><div class="card-img-wrap final" id="res-${id}"><span class="placeholder">处理中…</span></div></div>
+    <div class="card-status" id="st-${id}">正在分析背景色…</div>
+    <div class="card-actions" id="act-${id}"></div>`;
+  $('grid').appendChild(card);
+}
+
+async function processImage(id,tol){
+  const job=jobs.get(id);if(!job)return;
+  try{
+    $(`st-${id}`).textContent='正在抠图…';
+    let blob=await removeBgCanvas(job.blobUrl,tol);
+    $(`st-${id}`).textContent='清晰化…';
+    blob=await sharpenBlob(blob,1);
+    const tw=parseInt($('outW').value)||0,th=parseInt($('outH').value)||0;
+    if(tw||th){blob=await fitCanvas(blob,tw,th);$(`st-${id}`).textContent='调整尺寸…'}
+    const url=URL.createObjectURL(blob);
+    job.resultBlob=blob;job.resultUrl=url;job.status='done';
+    $(`res-${id}`).innerHTML=`<img src="${url}" alt="结果">`;
+    $(`st-${id}`).textContent='完成 ✓';
+    $(`act-${id}`).innerHTML=`<button class="btn btn-glass btn-sm" onclick="dlOne(${id})">💾 下载</button>`;
+    $(`card-${id}`).classList.add('done');
+  }catch(e){
+    job.status='error';$(`st-${id}`).textContent='失败: '+e.message;
+    $(`res-${id}`).innerHTML='<span class="placeholder">❌</span>';
+  }
+  updateUI();
+}
+
+function updateUI(){
+  const all=Array.from(jobs.values());const done=all.filter(j=>j.status==='done');
+  $('btnClear').disabled=!all.length;$('btnZip').disabled=!done.length;
+  $('btnZip').textContent=`📦 下载 ZIP${done.length?` (${done.length})`:''}`;
+  $('statusMsg').textContent=all.length?`${done.length}/${all.length} 完成`:'就绪';
+  if(!all.length)$('emptyState').style.display='flex';
+}
+
+function dlOne(id){const j=jobs.get(id);if(j?.resultBlob)dlBlob(j.resultBlob,j.file.name.replace(/\.[^.]+$/,'')+'（扣图版）.png')}
+async function downloadZip(){
+  const done=Array.from(jobs.values()).filter(j=>j.status==='done'&&j.resultBlob);
+  if(!done.length)return;const z=[];const seen=new Map();
+  for(const j of done){let n=j.file.name.replace(/\.[^.]+$/,'')+'（扣图版）.png';if(seen.has(n)){let c=1;while(seen.has(n.replace('（扣图版）',`（${c}）（扣图版）`)))c++;n=n.replace('（扣图版）',`（${c}）（扣图版）`)}seen.set(n,true);z.push({name:n,blob:j.resultBlob})}
+  dlBlob(await makeZip(z),'抠图结果.zip');
+}
+function clearAll(){
+  for(const[,j]of jobs){if(j.blobUrl)URL.revokeObjectURL(j.blobUrl);if(j.resultUrl)URL.revokeObjectURL(j.resultUrl)}
+  jobs.clear();$('grid').innerHTML='';$('emptyState').style.display='flex';updateUI();
 }
 </script>
 </body>
