@@ -77,6 +77,22 @@
   .model-bar-wrap .mbar-fill{height:100%;background:var(--accent);border-radius:2px;transition:width .3s;width:0%}
   .model-bar-wrap .mpct{font-size:11px;color:var(--accent);letter-spacing:.03em;white-space:nowrap;min-width:36px;text-align:right}
 
+  /* Size row */
+  .size-row{
+    background:var(--glass);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+    border:1px solid var(--glass-border);border-radius:var(--radius-sm);padding:10px 14px;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap
+  }
+  .size-label{font-size:12px;color:var(--text-secondary);letter-spacing:.03em;white-space:nowrap}
+  .size-row input{
+    width:72px;padding:6px 8px;border-radius:8px;border:1px solid var(--glass-border);
+    background:rgba(0,0,0,.3);color:var(--text);font-size:13px;font-family:inherit;text-align:center;
+    -webkit-appearance:none;appearance:none;outline:none
+  }
+  .size-row input:focus{border-color:var(--accent)}
+  .size-x{color:var(--text-secondary);font-size:13px}
+  .size-hint{font-size:10px;color:var(--text-secondary);letter-spacing:.02em;flex:1;min-width:140px}
+
   /* Toolbar */
   .toolbar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
   .toolbar .status{font-size:12px;color:var(--text-secondary);letter-spacing:.03em;display:flex;align-items:center;gap:6px}
@@ -193,6 +209,15 @@
     <span class="mlabel">🧠 AI 模型预加载</span>
     <div class="mbar"><div class="mbar-fill" id="modelFill"></div></div>
     <span class="mpct" id="modelPct">0%</span>
+  </div>
+
+  <!-- 输出尺寸设置 -->
+  <div class="size-row" id="sizeRow">
+    <span class="size-label">输出尺寸</span>
+    <input type="number" id="outW" placeholder="宽" min="0" step="1" inputmode="numeric">
+    <span class="size-x">×</span>
+    <input type="number" id="outH" placeholder="高" min="0" step="1" inputmode="numeric">
+    <span class="size-hint">留空 = 原始尺寸；设置后不足自动补透明背景居中</span>
   </div>
 
   <div class="toolbar">
@@ -433,10 +458,19 @@ async function processImage(id) {
       },
     };
 
-    const resultBlob = await removeBackgroundFn(job.blobUrl, config);
+    let resultBlob = await removeBackgroundFn(job.blobUrl, config);
     badge(id, 'badge-processing', '处理');
-    progressBar.style.width = '85%';
+    progressBar.style.width = '70%';
     statusEl.textContent = '生成中…';
+
+    // 自定义输出尺寸
+    const tw = parseInt($('outW').value) || 0;
+    const th = parseInt($('outH').value) || 0;
+    if (tw > 0 || th > 0) {
+      statusEl.textContent = `调整尺寸至 ${tw||'auto'}×${th||'auto'}…`;
+      progressBar.style.width = '85%';
+      resultBlob = await resizeCanvas(resultBlob, tw, th);
+    }
 
     const resultUrl = URL.createObjectURL(resultBlob);
     job.resultBlob = resultBlob;
@@ -466,6 +500,42 @@ async function processImage(id) {
   activeCount--;
   updateStatus();
   updateToolbar();
+}
+
+// 将图片居中放置到目标尺寸的透明画布上
+async function resizeCanvas(blob, tw, th) {
+  const img = await new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => resolve(i);
+    i.onerror = reject;
+    i.src = URL.createObjectURL(blob);
+  });
+
+  const w = img.naturalWidth;
+  const h = img.naturalHeight;
+  const ow = tw > 0 ? tw : w;
+  const oh = th > 0 ? th : h;
+
+  // 如果原图已大于等于目标尺寸且不强制拉伸，直接返回原 blob
+  if (w >= ow && h >= oh && tw > 0 && th > 0) {
+    // 仍然需要裁剪/缩放：保持比例适配目标区域
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = ow;
+  canvas.height = oh;
+  const ctx = canvas.getContext('2d');
+
+  // 计算居中放置的缩放和位置（contain 模式）
+  const scale = Math.min(ow / w, oh / h, 1); // 不放大，只缩小
+  const sw = w * scale;
+  const sh = h * scale;
+  const sx = (ow - sw) / 2;
+  const sy = (oh - sh) / 2;
+
+  ctx.drawImage(img, sx, sy, sw, sh);
+
+  return new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
 }
 
 function updateStatus() {
