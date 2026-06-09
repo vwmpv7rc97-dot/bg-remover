@@ -120,8 +120,12 @@ header p{font-size:13px;color:var(--text-secondary);margin-top:4px}
 
   <div class="settings">
     <span style="font-size:12px;color:var(--accent);font-weight:600">🤖 AI</span>
-    <input type="text" id="hfToken" placeholder="HF Token（可选）" style="flex:1;min-width:120px;padding:5px 8px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(0,0,0,.3);color:var(--text);font-size:12px;font-family:monospace;outline:none">
-    <a href="https://huggingface.co/settings/tokens" target="_blank" style="font-size:10px;color:var(--accent);white-space:nowrap">获取免费Token</a>
+    <select id="aiProvider" style="padding:4px 8px;border-radius:7px;border:1px solid var(--glass-border);background:rgba(0,0,0,.3);color:var(--text);font-size:11px;font-family:inherit;outline:none">
+      <option value="modelscope" selected>魔搭 (国内)</option>
+      <option value="huggingface">HuggingFace</option>
+    </select>
+    <input type="text" id="aiToken" placeholder="粘贴 Token" style="flex:1;min-width:120px;padding:5px 8px;border-radius:8px;border:1px solid var(--glass-border);background:rgba(0,0,0,.3);color:var(--text);font-size:12px;font-family:monospace;outline:none">
+    <a id="aiTokenLink" href="https://modelscope.cn/my/myaccesstoken" target="_blank" style="font-size:10px;color:var(--accent);white-space:nowrap">获取免费Token</a>
     <span id="aiStatus" style="font-size:10px;color:var(--text-secondary)"></span>
   </div>
 
@@ -223,59 +227,83 @@ async function makeZip(files){
   all.set(e,p);return new Blob([all],{type:'application/zip'});
 }
 
-// ===== Hugging Face AI 抠图 =====
-async function removeBgAI(inputUrl, token){
-  // 获取图片 Blob
-  const resp=await fetch(inputUrl);
-  const imgBlob=await resp.blob();
+// ===== AI 抠图（魔搭 / HuggingFace 双 provider） =====
+async function removeBgAI(inputUrl, token, provider){
+  const resp=await fetch(inputUrl);const imgBlob=await resp.blob();
 
-  // 调用 briaai/RMBG-2.0 模型
-  const apiResp=await fetch('https://api-inference.huggingface.co/models/briaai/RMBG-2.0',{
-    method:'POST',
-    headers:{'Authorization':'Bearer '+token},
-    body:imgBlob,
-  });
-
-  if(!apiResp.ok){
-    const err=await apiResp.text();
-    throw new Error(`API ${apiResp.status}: ${err.slice(0,100)}`);
+  let apiResp;
+  if(provider==='modelscope'){
+    // 魔搭 API（国内直连）
+    apiResp=await fetch('https://api.modelscope.cn/api/v1/models/briaai/RMBG-2.0/predictions',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+token,'Content-Type':'application/json'},
+      body:JSON.stringify({input:{image:await blobToBase64(imgBlob)}}),
+    });
+  }else{
+    // HuggingFace API
+    apiResp=await fetch('https://api-inference.huggingface.co/models/briaai/RMBG-2.0',{
+      method:'POST',
+      headers:{'Authorization':'Bearer '+token},
+      body:imgBlob,
+    });
   }
 
-  // 返回 mask（黑白图，白色=前景）
-  const maskBlob=await apiResp.blob();
-  const maskImg=await loadImage(URL.createObjectURL(maskBlob));
+  if(!apiResp.ok){const err=await apiResp.text();throw new Error(`${apiResp.status}: ${err.slice(0,120)}`)}
 
-  // 用 mask 合成透明 PNG
+  // 解析响应获取 mask
+  let maskBlob;
+  const contentType=apiResp.headers.get('content-type')||'';
+  if(contentType.includes('application/json')){
+    // 魔搭返回 JSON
+    const json=await apiResp.json();
+    // 魔搭响应格式可能不同，尝试多种路径
+    const b64=json.Data?.mask||json.data?.mask||json.output?.mask||json.mask||'';
+    if(b64){
+      maskBlob=base64ToBlob(b64,'image/png');
+    }else{
+      // 可能直接返回了 image bytes
+      maskBlob=new Blob([new Uint8Array(Object.values(json))],{type:'image/png'});
+    }
+  }else{
+    maskBlob=await apiResp.blob();
+  }
+
+  const maskImg=await loadImage(URL.createObjectURL(maskBlob));
   const origImg=await loadImage(inputUrl);
   const w=origImg.naturalWidth,h=origImg.naturalHeight;
   const cvs=document.createElement('canvas');cvs.width=w;cvs.height=h;
-  const ctx=cvs.getContext('2d');
-  ctx.drawImage(origImg,0,0);
-  // mask 可能尺寸不同，需要缩放
+  const ctx=cvs.getContext('2d');ctx.drawImage(origImg,0,0);
   const mCvs=document.createElement('canvas');mCvs.width=w;mCvs.height=h;
   const mCtx=mCvs.getContext('2d');mCtx.drawImage(maskImg,0,0,w,h);
   const src=ctx.getImageData(0,0,w,h);
   const mask=mCtx.getImageData(0,0,w,h);
-  for(let i=0;i<src.data.length;i+=4){
-    // mask 白色=255=前景保留，黑色=0=背景透明
-    src.data[i+3]=mask.data[i]; // 用 mask 亮度做 alpha
-  }
+  for(let i=0;i<src.data.length;i+=4){src.data[i+3]=mask.data[i]}
   ctx.putImageData(src,0,0);
   const blob=await new Promise(r=>cvs.toBlob(r,'image/png'));
-
-  // 同时返回 mask ImageData 给编辑器用
   return {blob, mask:mCtx.getImageData(0,0,w,h)};
 }
 
-// Token 管理
-$('hfToken').addEventListener('input',function(){
-  localStorage.setItem('hf_token',this.value.trim());
+function blobToBase64(blob){
+  return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result.split(',')[1]);r.onerror=rej;r.readAsDataURL(blob)});
+}
+function base64ToBlob(b64,mime){const bs=atob(b64),arr=new Uint8Array(bs.length);for(let i=0;i<bs.length;i++)arr[i]=bs.charCodeAt(i);return new Blob([arr],{type:mime})}
+
+// Token / Provider 管理
+$('aiToken').addEventListener('input',function(){
+  localStorage.setItem('ai_token',this.value.trim());
   $('aiStatus').textContent=this.value.trim()?'✅ AI 已启用':'';
 });
-// 加载已保存的 token
+$('aiProvider').addEventListener('change',function(){
+  const p=this.value;
+  localStorage.setItem('ai_provider',p);
+  $('aiTokenLink').href=p==='modelscope'?'https://modelscope.cn/my/myaccesstoken':'https://huggingface.co/settings/tokens';
+});
 (function(){
-  const saved=localStorage.getItem('hf_token');
-  if(saved){$('hfToken').value=saved;$('aiStatus').textContent='✅ AI 已启用'}
+  const p=localStorage.getItem('ai_provider')||'modelscope';
+  $('aiProvider').value=p;
+  $('aiTokenLink').href=p==='modelscope'?'https://modelscope.cn/my/myaccesstoken':'https://huggingface.co/settings/tokens';
+  const t=localStorage.getItem('ai_token');
+  if(t){$('aiToken').value=t;$('aiStatus').textContent='✅ AI 已启用'}
 })();
 
 // ===== Canvas 抠图引擎 =====
@@ -457,15 +485,16 @@ async function processImage(id,tol){
   try{
     $(`st-${id}`).textContent='正在抠图…';
     // 优先用 AI，失败回退 Canvas
-    const hfToken=$('hfToken').value.trim();
+    const aiToken=$('aiToken').value.trim();
+    const aiProvider=$('aiProvider').value;
     let blob,aiMask=null;
-    if(hfToken){
+    if(aiToken){
       try{
-        $(`st-${id}`).textContent='🤖 AI 抠图中…';
-        const result=await removeBgAI(job.blobUrl,hfToken);
+        $(`st-${id}`).textContent=`🤖 AI (${aiProvider==='modelscope'?'魔搭':'HF'}) 抠图中…`;
+        const result=await removeBgAI(job.blobUrl,aiToken,aiProvider);
         blob=result.blob;
-        aiMask=result.mask; // ImageData mask
-        job.aiMask=aiMask; // 保存给编辑器用
+        aiMask=result.mask;
+        job.aiMask=aiMask;
       }catch(e){console.warn('AI失败，回退Canvas:',e.message);$(`st-${id}`).textContent='AI失败，回退Canvas…'}
     }
     if(!blob){
